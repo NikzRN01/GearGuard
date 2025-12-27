@@ -14,11 +14,13 @@ router.get('/', (req, res) => {
         e.name as equipment_name,
         e.serial_number,
         e.department,
+        wc.name as work_center_name,
         t.name as team_name,
         u.name as assigned_to_name,
         c.name as created_by_name
       FROM maintenance_requests mr
-      JOIN equipment e ON mr.equipment_id = e.id
+      LEFT JOIN equipment e ON mr.equipment_id = e.id
+      LEFT JOIN work_centers wc ON mr.work_center_id = wc.id
       LEFT JOIN teams t ON mr.team_id = t.id
       LEFT JOIN users u ON mr.assigned_to_user_id = u.id
       JOIN users c ON mr.created_by_user_id = c.id
@@ -71,11 +73,12 @@ router.get('/calendar', (req, res) => {
       SELECT 
         mr.*,
         e.name as equipment_name,
-        e.serial_number,
+        wc.name as work_center_name,
         t.name as team_name,
         u.name as assigned_to_name
       FROM maintenance_requests mr
-      JOIN equipment e ON mr.equipment_id = e.id
+      LEFT JOIN equipment e ON mr.equipment_id = e.id
+      LEFT JOIN work_centers wc ON mr.work_center_id = wc.id
       LEFT JOIN teams t ON mr.team_id = t.id
       LEFT JOIN users u ON mr.assigned_to_user_id = u.id
       WHERE mr.scheduled_date IS NOT NULL
@@ -114,14 +117,15 @@ router.get('/:id', (req, res) => {
         e.name as equipment_name,
         e.serial_number,
         e.department,
-        e.location,
+        wc.name as work_center_name,
         t.name as team_name,
         u.name as assigned_to_name,
         u.email as assigned_to_email,
         c.name as created_by_name,
         c.email as created_by_email
       FROM maintenance_requests mr
-      JOIN equipment e ON mr.equipment_id = e.id
+      LEFT JOIN equipment e ON mr.equipment_id = e.id
+      LEFT JOIN work_centers wc ON mr.work_center_id = wc.id
       LEFT JOIN teams t ON mr.team_id = t.id
       LEFT JOIN users u ON mr.assigned_to_user_id = u.id
       JOIN users c ON mr.created_by_user_id = c.id
@@ -157,15 +161,17 @@ router.post('/', (req, res) => {
       type,
       subject,
       equipment_id,
+      work_center_id,
+      team_id,
       scheduled_date,
       created_by_user_id
     } = req.body;
     
     // Validate required fields
-    if (!type || !subject || !equipment_id || !created_by_user_id) {
+    if (!type || !subject || (!equipment_id && !work_center_id) || (equipment_id && work_center_id) || !created_by_user_id) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Type, subject, equipment, and creator are required' 
+        message: 'Type, subject, creator, and exactly one of equipment or work center are required' 
       });
     }
     
@@ -185,13 +191,26 @@ router.post('/', (req, res) => {
       });
     }
     
-    // Check if equipment exists and get its maintenance team (AUTO-FILL LOGIC)
-    const equipment = db.prepare('SELECT id, maintenance_team_id, name FROM equipment WHERE id = ?').get(equipment_id);
-    if (!equipment) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Equipment not found' 
-      });
+    let resolvedTeamId = team_id || null;
+    let equipmentName = null;
+    let workCenterName = null;
+
+    if (equipment_id) {
+      const equipment = db.prepare('SELECT id, maintenance_team_id, name FROM equipment WHERE id = ?').get(equipment_id);
+      if (!equipment) {
+        return res.status(404).json({ success: false, message: 'Equipment not found' });
+      }
+      equipmentName = equipment.name;
+      // Auto-fill team if not provided
+      resolvedTeamId = resolvedTeamId || equipment.maintenance_team_id || null;
+    }
+
+    if (work_center_id) {
+      const wc = db.prepare('SELECT id, name FROM work_centers WHERE id = ?').get(work_center_id);
+      if (!wc) {
+        return res.status(404).json({ success: false, message: 'Work center not found' });
+      }
+      workCenterName = wc.name;
     }
     
     // Check if user exists
@@ -203,21 +222,19 @@ router.post('/', (req, res) => {
       });
     }
     
-    // Auto-fill team_id from equipment
-    const team_id = equipment.maintenance_team_id;
-    
     const stmt = db.prepare(`
       INSERT INTO maintenance_requests (
-        type, subject, equipment_id, team_id, scheduled_date, 
+        type, subject, equipment_id, work_center_id, team_id, scheduled_date, 
         status, created_by_user_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const result = stmt.run(
       type,
       subject,
-      equipment_id,
-      team_id,
+      equipment_id || null,
+      work_center_id || null,
+      resolvedTeamId,
       scheduled_date || null,
       'new', // Default status
       created_by_user_id
@@ -226,11 +243,7 @@ router.post('/', (req, res) => {
     res.status(201).json({ 
       success: true, 
       message: 'Maintenance request created successfully',
-      data: { 
-        id: result.lastInsertRowid,
-        team_id: team_id,
-        equipment_name: equipment.name
-      }
+      data: { id: result.lastInsertRowid, team_id: resolvedTeamId, equipment_name: equipmentName, work_center_name: workCenterName }
     });
   } catch (error) {
     console.error('Create maintenance request error:', error);
@@ -404,6 +417,7 @@ router.put('/:id', (req, res) => {
       type,
       subject,
       equipment_id,
+      work_center_id,
       scheduled_date,
       duration_hours
     } = req.body;
@@ -422,14 +436,26 @@ router.put('/:id', (req, res) => {
       });
     }
     
-    // If equipment is being changed, auto-fill team_id
+    // If equipment is being changed, auto-fill team_id and clear work_center_id
     let team_id = null;
+    let newEquipmentId = equipment_id || null;
+    let newWorkCenterId = work_center_id || null;
+
     if (equipment_id) {
       const equipment = db.prepare('SELECT maintenance_team_id FROM equipment WHERE id = ?').get(equipment_id);
       if (!equipment) {
         return res.status(404).json({ success: false, message: 'Equipment not found' });
       }
       team_id = equipment.maintenance_team_id;
+      newWorkCenterId = null; // switch target
+    }
+    // If work center is being changed, clear equipment_id
+    if (work_center_id) {
+      const wc = db.prepare('SELECT id FROM work_centers WHERE id = ?').get(work_center_id);
+      if (!wc) {
+        return res.status(404).json({ success: false, message: 'Work center not found' });
+      }
+      newEquipmentId = null; // switch target
     }
     
     // Validate type if provided
@@ -444,7 +470,8 @@ router.put('/:id', (req, res) => {
       UPDATE maintenance_requests SET
         type = COALESCE(?, type),
         subject = COALESCE(?, subject),
-        equipment_id = COALESCE(?, equipment_id),
+        equipment_id = ?,
+        work_center_id = ?,
         team_id = COALESCE(?, team_id),
         scheduled_date = ?,
         duration_hours = ?,
@@ -455,7 +482,8 @@ router.put('/:id', (req, res) => {
     stmt.run(
       type,
       subject,
-      equipment_id,
+      newEquipmentId,
+      newWorkCenterId,
       team_id,
       scheduled_date,
       duration_hours,

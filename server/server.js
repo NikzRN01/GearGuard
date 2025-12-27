@@ -6,6 +6,7 @@ const authRoutes = require('./routes/authRoutes');
 const equipmentRoutes = require('./routes/equipmentRoutes');
 const teamRoutes = require('./routes/teamRoutes');
 const maintenanceRoutes = require('./routes/maintenanceRoutes');
+const workCenterRoutes = require('./routes/workCenterRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -20,6 +21,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/equipment', equipmentRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/work-centers', workCenterRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

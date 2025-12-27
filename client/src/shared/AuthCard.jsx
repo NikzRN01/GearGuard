@@ -1,26 +1,39 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
-export default function AuthCard({ title, children, className }) {
+export default function AuthCard({ title, subtitle, children, className }) {
   const { pathname } = useLocation();
   const isLogin = pathname.includes('login');
+
   return (
     <div className="auth-layout">
+      <div className="auth-backdrop" aria-hidden="true">
+        <span className="orb orb-a" />
+        <span className="orb orb-b" />
+        <span className="orb orb-c" />
+      </div>
+
       <div className={`auth-card ${className || ''}`}>
-        <div className="brand">GearGuard Portal</div>
-        <h2>{title}</h2>
-        <div className="muted" style={{marginBottom:8}}>
+        <div className="card-header">
+          <div className="brand">GearGuard</div>
+          <h1>{title}</h1>
+          {subtitle && <p className="card-subtitle">{subtitle}</p>}
+        </div>
+
+        <div className="auth-switch">
           {isLogin ? (
-            <>New here? <Link to="/signup">Create an account</Link></>
+            <>Don't have an account? <Link to="/signup">Sign up</Link></>
           ) : (
             <>Already have an account? <Link to="/login">Sign in</Link></>
           )}
         </div>
+
         {children}
       </div>
-      <div className="caption">
-        Clean, responsive layout with subtle motion and dark theme.
-      </div>
+
+      <p className="caption">
+        Secure equipment management for operations teams.
+      </p>
     </div>
   );
 }

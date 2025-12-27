@@ -114,6 +114,48 @@ const createNotesTable = () => {
   db.prepare(query).run();
 };
 
+// Create work_centers table (no created_at, location, department per request)
+const createWorkCentersTable = () => {
+  const query = `
+    CREATE TABLE IF NOT EXISTS work_centers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      code TEXT UNIQUE,
+      tag TEXT,
+      cost_per_hour REAL DEFAULT 0 CHECK(cost_per_hour >= 0),
+      capacity_per_hour REAL DEFAULT 0 CHECK(capacity_per_hour >= 0),
+      time_efficiency_pct REAL DEFAULT 100 CHECK(time_efficiency_pct BETWEEN 0 AND 100),
+      oee_target_pct REAL DEFAULT 0 CHECK(oee_target_pct BETWEEN 0 AND 100),
+      status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive'))
+    )
+  `;
+  db.prepare(query).run();
+};
+
+// Create work_center_alternatives linking table
+const createWorkCenterAlternativesTable = () => {
+  const query = `
+    CREATE TABLE IF NOT EXISTS work_center_alternatives (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      work_center_id INTEGER NOT NULL,
+      alternative_work_center_id INTEGER NOT NULL,
+      FOREIGN KEY (work_center_id) REFERENCES work_centers(id) ON DELETE CASCADE,
+      FOREIGN KEY (alternative_work_center_id) REFERENCES work_centers(id) ON DELETE CASCADE,
+      UNIQUE(work_center_id, alternative_work_center_id)
+    )
+  `;
+  db.prepare(query).run();
+};
+
+// Add work_center_id to maintenance_requests if missing
+const addWorkCenterIdColumn = () => {
+  const columns = db.prepare("PRAGMA table_info(maintenance_requests)").all();
+  const hasColumn = columns.some(c => c.name === 'work_center_id');
+  if (!hasColumn) {
+    db.prepare('ALTER TABLE maintenance_requests ADD COLUMN work_center_id INTEGER').run();
+  }
+};
+
 // Initialize all tables
 const initializeDatabase = () => {
   createUsersTable();
@@ -122,6 +164,9 @@ const initializeDatabase = () => {
   createEquipmentTable();
   createMaintenanceRequestsTable();
   createNotesTable();
+  createWorkCentersTable();
+  createWorkCenterAlternativesTable();
+  addWorkCenterIdColumn();
   console.log('Database initialized successfully');
 };
 
