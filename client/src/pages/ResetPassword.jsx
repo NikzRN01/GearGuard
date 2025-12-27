@@ -169,16 +169,6 @@ export default function ResetPassword() {
             'Reset Password'
           )}
         </button>
-
-        <div style={{ textAlign: 'center', marginTop: '20px' }}>
-          <button 
-            type="button" 
-            className="link-btn" 
-            onClick={() => navigate('/login')}
-          >
-            Back to Login
-          </button>
-        </div>
       </form>
     </AuthCard>
   );
