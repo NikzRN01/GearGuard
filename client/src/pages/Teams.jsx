@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 export default function Teams() {
     const [showForm, setShowForm] = useState(false);
@@ -79,7 +80,8 @@ export default function Teams() {
                 </table>
             </div>
 
-            {showForm && (
+            {showForm && 
+                createPortal(
                 <div className="modal-overlay" onMouseDown={closeNew}>
                     <div className="equipment-modal" onMouseDown={(e) => e.stopPropagation()}>
                         <div className="equipment-modal-top">
@@ -135,7 +137,8 @@ export default function Teams() {
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
         </div>
