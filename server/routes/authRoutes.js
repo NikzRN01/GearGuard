@@ -201,7 +201,7 @@ router.post("/forget-password", async (req, res) => {
           <p>Hello <strong>${user.name}</strong>,</p>
           <p>You requested to reset your password for your GearGuard account.</p>
           <p>Click the button below to reset your password:</p>
-          <a href="http://localhost:3000/reset-password?email=${email}" 
+          <a href="http://localhost:5173/reset-password?email=${email}" 
              style="display: inline-block; padding: 12px 24px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0;">
             Reset Password
           </a>
@@ -231,4 +231,72 @@ router.post("/forget-password", async (req, res) => {
   }
 });
 
+// Reset Password Route
+router.post("/reset-password", async (req, res) => {
+  try {
+    const { email, newPassword, confirmPassword } = req.body;
+    
+    // Validate required fields
+    if (!email || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, new password, and confirm password are required'
+      });
+    }
+    
+    // Validate email format
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid email format'
+      });
+    }
+    
+    // Check if passwords match
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Passwords do not match'
+      });
+    }
+    
+    // Validate password strength
+    const passwordErrors = validatePassword(newPassword);
+    if (passwordErrors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: passwordErrors.join('. ')
+      });
+    }
+    
+    // Check if user exists
+    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Account not found'
+      });
+    }
+    
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    // Update password in database
+    db.prepare('UPDATE users SET password = ? WHERE email = ?').run(hashedPassword, email);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully'
+    });
+    
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset password'
+    });
+  }
+});
+
 module.exports = router;
+

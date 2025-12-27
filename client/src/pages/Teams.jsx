@@ -1,5 +1,9 @@
+<<<<<<< HEAD
 import React, { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+=======
+import React, { useState } from 'react';
+>>>>>>> cc0b8745e139c3e64b7eee205506beefdf0eafed
 
 export default function Teams() {
     const [showForm, setShowForm] = useState(false);
@@ -52,14 +56,15 @@ export default function Teams() {
                     <p className="muted">Manage maintenance teams and members.</p>
                 </div>
 
-                <button className="btn-secondary" type="button" onClick={openNew}>
-                    New
-                </button>
-
+                <div className="page-actions">
+                    <button className="btn-accent" type="button" onClick={openNew}>
+                        New
+                    </button>
+                </div>
             </div>
 
-            <div className="teams-table-wrap">
-                <table className="teams-table">
+            <div className="table-wrap">
+                <table className="table" style={{ minWidth: 720 }}>
                     <thead>
                         <tr>
                             <th scope="col">Team Name</th>
@@ -83,57 +88,54 @@ export default function Teams() {
             {showForm && 
                 createPortal(
                 <div className="modal-overlay" onMouseDown={closeNew}>
-                    <div className="equipment-modal" onMouseDown={(e) => e.stopPropagation()}>
-                        <div className="equipment-modal-top">
-                            <h2 className="equipment-modal-title">New Team</h2>
+                    <div className="modal-content" onMouseDown={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+                        <h3>New Team</h3>
+                        <p>Create a maintenance team.</p>
 
-                            <div className="equipment-modal-actions">
+                        <form id="teamForm" onSubmit={onSubmit}>
+                            <div className="input-group">
+                                <label>Team Name *</label>
+                                <input
+                                    className="modal-input"
+                                    name="name"
+                                    value={form.name}
+                                    onChange={onChange}
+                                    required
+                                    placeholder="e.g., Internal Maintenance"
+                                />
+                            </div>
+
+                            <div className="input-group">
+                                <label>Company *</label>
+                                <input
+                                    className="modal-input"
+                                    name="company"
+                                    value={form.company}
+                                    onChange={onChange}
+                                    required
+                                    placeholder="e.g., My Company (San Francisco)"
+                                />
+                            </div>
+
+                            <div className="input-group">
+                                <label>Team Members *</label>
+                                <input
+                                    className="modal-input"
+                                    name="members"
+                                    value={form.members}
+                                    onChange={onChange}
+                                    required
+                                    placeholder="e.g., Marc Demo, Maggie Davidson"
+                                />
+                            </div>
+
+                            <div className="modal-actions">
                                 <button className="btn-secondary" type="button" onClick={closeNew}>
                                     Cancel
                                 </button>
-                                <button className="btn-accent" type="submit" form="teamForm">
+                                <button className="btn-accent" type="submit">
                                     Submit
                                 </button>
-                            </div>
-                        </div>
-
-                        <form id="teamForm" className="equipment-form" onSubmit={onSubmit}>
-                            <div className="equipment-form-grid">
-                                <div className="field">
-                                    <label>Team Name *</label>
-                                    <input
-                                        className="modal-input"
-                                        name="name"
-                                        value={form.name}
-                                        onChange={onChange}
-                                        required
-                                        placeholder="e.g., Internal Maintenance"
-                                    />
-                                </div>
-
-                                <div className="field">
-                                    <label>Company *</label>
-                                    <input
-                                        className="modal-input"
-                                        name="company"
-                                        value={form.company}
-                                        onChange={onChange}
-                                        required
-                                        placeholder="e.g., My Company (San Francisco)"
-                                    />
-                                </div>
-
-                                <div className="field field-wide">
-                                    <label>Team Members *</label>
-                                    <input
-                                        className="modal-input"
-                                        name="members"
-                                        value={form.members}
-                                        onChange={onChange}
-                                        required
-                                        placeholder="e.g., Marc Demo, Maggie Davidson"
-                                    />
-                                </div>
                             </div>
                         </form>
                     </div>

@@ -10,6 +10,7 @@ import WorkCenter from './pages/WorkCenter.jsx';
 import MachineTools from './pages/MachineTools.jsx';
 import Requests from './pages/Requests.jsx';
 import Teams from './pages/Teams.jsx';
+import ResetPassword from './pages/ResetPassword.jsx';
 import './styles.css';
 
 const root = createRoot(document.getElementById('root'));
@@ -20,6 +21,7 @@ root.render(
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         <Route path="/app" element={<App />}>
           <Route index element={<DashboardHome />} />

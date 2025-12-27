@@ -115,28 +115,31 @@ export default function MachineTools() {
 
     return (
         <div className="container">
-            <div className="list-toolbar">
-                <h1 className="list-title">Equipment</h1>
-
-                <div className="list-search">
-                    <input
-                        className="list-search-input"
-                        type="search"
-                        placeholder="Search..."
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                    />
+            <div className="page-header">
+                <div>
+                    <h1>Equipment</h1>
+                    <p className="muted">Manage equipment and assignments.</p>
                 </div>
 
-                <button className="btn-secondary list-new-btn btn-accent" type="button" onClick={openNew}>
-                    New
-                </button>
+                <div className="page-actions">
+                    <input
+                        className="modal-input"
+                        style={{ marginBottom: 0, width: 260 }}
+                        type="search"
+                        placeholder="Search"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        aria-label="Search equipment"
+                    />
 
+                    <button className="btn-accent" type="button" onClick={openNew}>
+                        New
+                    </button>
+                </div>
             </div>
 
-
-            <div className="list-table-wrap">
-                <table className="list-table">
+            <div className="table-wrap">
+                <table className="table">
                     <thead>
                         <tr>
                             <th scope="col">Equipment Name</th>
@@ -164,7 +167,7 @@ export default function MachineTools() {
 
                         {filtered.length === 0 && (
                             <tr>
-                                <td colSpan={7} className="list-empty">
+                                <td colSpan={7} className="table-empty">
                                     No equipment found.
                                 </td>
                             </tr>
