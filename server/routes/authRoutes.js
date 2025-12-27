@@ -32,32 +32,13 @@ const validatePassword = (password) => {
 };
 // Email transporter configuration - Using Ethereal for testing (no setup required!)
 // Ethereal creates test accounts automatically and shows preview URLs
-let transporter;
-
-// Create Ethereal test account on startup
-nodemailer.createTestAccount().then(testAccount => {
-  transporter = nodemailer.createTransport({
-    host: 'smtp.ethereal.email',
-    port: 587,
-    secure: false,
-    auth: {
-      user: testAccount.user,
-      pass: testAccount.pass
-    }
-  });
-  console.log('Ethereal email test account created:', testAccount.user);
-}).catch(err => {
-  console.error('Failed to create Ethereal account:', err);
-  // Fallback to Gmail if Ethereal fails
-  transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
+// Email transporter configuration for Gmail
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
 });
 // Sign Up Route
 router.post('/signup', async (req, res) => {
