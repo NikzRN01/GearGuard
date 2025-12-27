@@ -12,6 +12,10 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState('');
+  const [forgotSuccess, setForgotSuccess] = useState('');
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -38,6 +42,37 @@ export default function Login() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setForgotError('');
+    setForgotSuccess('');
+    setForgotLoading(true);
+    
+    try {
+      const { data } = await api.post('/auth/forget-password', { email: forgotEmail });
+      if (data?.success) {
+        setForgotSuccess('Password reset email sent! Please check your inbox.');
+        setTimeout(() => {
+          setShowForgotPassword(false);
+          setForgotEmail('');
+          setForgotSuccess('');
+        }, 3000);
+      } else {
+        setForgotError(data?.message || 'Failed to send reset email');
+      }
+    } catch (err) {
+      if (err?.code === 'ERR_NETWORK') {
+        setForgotError('Unable to connect to server. Please check your connection.');
+      } else if (err?.response?.status === 404) {
+        setForgotError('No account found with this email address.');
+      } else {
+        setForgotError(err?.response?.data?.message || 'Failed to send reset email. Please try again.');
+      }
+    } finally {
+      setForgotLoading(false);
     }
   };
 
@@ -128,15 +163,57 @@ export default function Login() {
       </AuthCard>
 
       {showForgotPassword && (
-        <div className="modal-overlay" onClick={() => setShowForgotPassword(false)}>
+        <div className="modal-overlay" onClick={() => {
+          setShowForgotPassword(false);
+          setForgotEmail('');
+          setForgotError('');
+          setForgotSuccess('');
+        }}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3>Reset Password</h3>
             <p>Enter your email address and we'll send you a link to reset your password.</p>
-            <input type="email" placeholder="you@company.com" className="modal-input" />
-            <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setShowForgotPassword(false)}>Cancel</button>
-              <button className="btn-accent">Send Reset Link</button>
-            </div>
+            
+            <form onSubmit={handleForgotPassword}>
+              <input 
+                type="email" 
+                placeholder="you@company.com" 
+                className="modal-input" 
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                required
+                disabled={forgotLoading}
+              />
+              
+              {forgotError && <div className="alert alert-error" style={{marginTop: '10px'}}>{forgotError}</div>}
+              {forgotSuccess && <div className="alert alert-success" style={{marginTop: '10px'}}>{forgotSuccess}</div>}
+              
+              <div className="modal-actions">
+                <button 
+                  type="button"
+                  className="btn-secondary" 
+                  onClick={() => {
+                    setShowForgotPassword(false);
+                    setForgotEmail('');
+                    setForgotError('');
+                    setForgotSuccess('');
+                  }}
+                  disabled={forgotLoading}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn-accent"
+                  disabled={forgotLoading || !forgotEmail}
+                >
+                  {forgotLoading ? (
+                    <><span className="spinner" /> Sending...</>
+                  ) : (
+                    'Send Reset Link'
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
