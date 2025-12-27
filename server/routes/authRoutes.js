@@ -30,18 +30,34 @@ const validatePassword = (password) => {
 
   return errors;
 };
-// Email transporter configuration
-// For Gmail: host: "smtp.gmail.com", port: 587 or 465 (secure: true)
-// For Outlook: host: "smtp.office365.com", port: 587
-// For Ethereal (testing): host: "smtp.ethereal.email", port: 587
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com", // Change based on your email provider
-  port: 587,
-  secure: false, // use STARTTLS (upgrade connection to TLS after connecting)
-  auth: {
-    user: process.env.SMTP_USER, // Your email address
-    pass: process.env.SMTP_PASS, // Your app password (not regular password)
-  },
+// Email transporter configuration - Using Ethereal for testing (no setup required!)
+// Ethereal creates test accounts automatically and shows preview URLs
+let transporter;
+
+// Create Ethereal test account on startup
+nodemailer.createTestAccount().then(testAccount => {
+  transporter = nodemailer.createTransport({
+    host: 'smtp.ethereal.email',
+    port: 587,
+    secure: false,
+    auth: {
+      user: testAccount.user,
+      pass: testAccount.pass
+    }
+  });
+  console.log('Ethereal email test account created:', testAccount.user);
+}).catch(err => {
+  console.error('Failed to create Ethereal account:', err);
+  // Fallback to Gmail if Ethereal fails
+  transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
 });
 // Sign Up Route
 router.post('/signup', async (req, res) => {
@@ -194,7 +210,7 @@ router.post("/forget-password", async (req, res) => {
     
     // Send email using nodemailer
     const info = await transporter.sendMail({
-      from: '"GearGuard Team" <' + process.env.SMTP_USER + '>', // sender address
+      from: '"GearGuard Team" <noreply@gearguard.com>', // sender address
       to: email, // recipient
       subject: "Reset your password for GearGuard", // subject line
       text: "Hello, you requested to reset your password. Please click the link to reset your password.", // plain text body
