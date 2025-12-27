@@ -643,6 +643,8 @@ a {
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 24px 16px;
+    overflow-y: auto;
     z-index: 1000;
     animation: fadeIn 0.2s ease;
 }
@@ -665,6 +667,8 @@ a {
     padding: 28px;
     max-width: 420px;
     width: 90vw;
+    max-height: calc(100vh - 48px);
+    overflow: auto;
     animation: fadeUp 0.3s ease;
 }
 
@@ -838,10 +842,30 @@ a {
 
 .sidebar-dropdown summary {
     list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
 }
 
 .sidebar-dropdown[open] summary {
     background: rgba(90, 166, 255, 0.08);
+}
+
+.sidebar-caret {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    color: var(--muted);
+    opacity: 0.9;
+    transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.sidebar-dropdown[open] .sidebar-caret {
+    transform: rotate(90deg);
+    color: var(--accent2);
 }
 
 .sidebar-dropdown summary::-webkit-details-marker {
@@ -912,6 +936,58 @@ a {
     background: rgba(13, 20, 34, 0.9);
     border: 1px solid rgba(255, 255, 255, 0.04);
     box-shadow: 0 10px 22px rgba(0, 0, 0, 0.25);
+}
+
+/* Tables (Work Center / Requests style list views) */
+.page-actions{
+    display:flex;
+    gap:10px;
+    align-items:center;
+}
+
+.table-wrap{
+    margin-top: 10px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(13, 20, 34, 0.85);
+    overflow: auto;
+}
+
+.table{
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 980px;
+}
+
+.table thead th{
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    text-align: left;
+    font-size: 12px;
+    letter-spacing: .6px;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 12px 12px;
+    background: rgba(15, 22, 38, 0.92);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.table tbody td{
+    padding: 12px 12px;
+    border-top: 1px dashed rgba(255,255,255,0.08);
+    color: var(--text);
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.table tbody tr:hover td{
+    background: rgba(90, 166, 255, 0.06);
+}
+
+.table-empty{
+    padding: 16px;
+    color: var(--muted);
 }
 
 .card h2 {

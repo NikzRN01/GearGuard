@@ -19,7 +19,20 @@ export default function App() {
         <NavLink to="/app" end>Home</NavLink>
         <NavLink to="/app/calendar">Maintenance Calendar</NavLink>
         <details className="sidebar-dropdown" open={isEquipmentPage}>
-          <summary>Equipment</summary>
+          <summary>
+            <span>Equipment</span>
+            <span className="sidebar-caret" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M7.25 4.75L12.5 10L7.25 15.25"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+          </summary>
           <div className="sidebar-submenu">
             <NavLink to="/app/equipment/work-center">Work Center</NavLink>
             <NavLink to="/app/equipment/machine-tools">Machine & Tools</NavLink>
