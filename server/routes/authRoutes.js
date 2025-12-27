@@ -1,6 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
-const db = require('./database');
+const db = require('../database');
 
 const router = express.Router();
 
