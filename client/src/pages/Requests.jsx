@@ -40,6 +40,7 @@ export default function Requests() {
 	const [requests, setRequests] = useState([]);
 	const [equipmentOptions, setEquipmentOptions] = useState([]);
 	const [workCenterOptions, setWorkCenterOptions] = useState([]);
+	const [teamOptions, setTeamOptions] = useState([]);
 
 	const [showNewModal, setShowNewModal] = useState(false);
 	const [newRequest, setNewRequest] = useState(DEFAULT_NEW_REQUEST);
@@ -72,12 +73,14 @@ export default function Requests() {
 
 	const loadPicklists = async () => {
 		try {
-			const [eq, wc] = await Promise.all([
+			const [eq, wc, teams] = await Promise.all([
 				api.get('/equipment'),
-				api.get('/work-centers')
+				api.get('/work-centers'),
+				api.get('/teams')
 			]);
 			setEquipmentOptions(eq?.data?.data || []);
 			setWorkCenterOptions(wc?.data?.data || []);
+			setTeamOptions(teams?.data?.data || []);
 		} catch {
 			// ignore; page can still function with manual inputs
 		}
@@ -736,7 +739,23 @@ export default function Requests() {
 										</div>
 										<div className="field">
 											<label>Maintenance Team</label>
-											<input className="form-input" value={newRequest.maintenance_team_name || ''} disabled />
+											<select
+												className="form-input"
+												value={newRequest.maintenance_team_id || ''}
+												onChange={(e) => {
+													const teamId = e.target.value;
+													onNewChange('maintenance_team_id', teamId);
+													const team = teamOptions.find(t => String(t.id) === teamId);
+													onNewChange('maintenance_team_name', team?.name || '');
+												}}
+											>
+												<option value="">-- Select Team --</option>
+												{teamOptions.map(team => (
+													<option key={team.id} value={team.id}>
+														{team.name}
+													</option>
+												))}
+											</select>
 										</div>
 									</>
 								)}

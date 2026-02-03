@@ -4,6 +4,9 @@ import { api } from '../services/api';
 
 export default function Teams() {
     const [showForm, setShowForm] = useState(false);
+    const [showAddMember, setShowAddMember] = useState(false);
+    const [selectedTeam, setSelectedTeam] = useState(null);
+    const [users, setUsers] = useState([]);
 
     const [rows, setRows] = useState([]);
 
@@ -13,19 +16,50 @@ export default function Teams() {
         company: 'My Company (San Francisco)',
     });
 
+    const [memberForm, setMemberForm] = useState({
+        user_id: ''
+    });
+
     // Fetch teams from backend on component mount
     useEffect(() => {
         fetchTeams();
+        fetchUsers();
     }, []);
 
     async function fetchTeams() {
         try {
             const { data } = await api.get('/teams');
             if (data?.success) {
-                setRows(data.data);
+                // Fetch members for each team
+                const teamsWithMembers = await Promise.all(
+                    data.data.map(async (team) => {
+                        try {
+                            const memberData = await api.get(`/teams/${team.id}`);
+                            return {
+                                ...team,
+                                members: memberData.data?.data?.members || []
+                            };
+                        } catch (err) {
+                            return { ...team, members: [] };
+                        }
+                    })
+                );
+                setRows(teamsWithMembers);
             }
         } catch (err) {
             console.error('Error fetching teams:', err);
+        }
+    }
+
+    async function fetchUsers() {
+        try {
+            // Fetch all users to show in add member dropdown
+            const { data } = await api.get('/teams/users/all');
+            if (data?.success) {
+                setUsers(data.data);
+            }
+        } catch (err) {
+            console.error('Error fetching users:', err);
         }
     }
 
@@ -63,6 +97,42 @@ export default function Teams() {
         }
     }
 
+    function openAddMember(team) {
+        setSelectedTeam(team);
+        setMemberForm({ user_id: '' });
+        setShowAddMember(true);
+    }
+
+    function closeAddMember() {
+        setShowAddMember(false);
+        setSelectedTeam(null);
+    }
+
+    function onMemberChange(e) {
+        setMemberForm({ user_id: e.target.value });
+    }
+
+    async function onAddMember(e) {
+        e.preventDefault();
+
+        if (!selectedTeam || !memberForm.user_id) return;
+
+        try {
+            const { data } = await api.post(`/teams/${selectedTeam.id}/members`, {
+                user_id: parseInt(memberForm.user_id)
+            });
+
+            if (data?.success) {
+                await fetchTeams();
+                setShowAddMember(false);
+                setSelectedTeam(null);
+            }
+        } catch (err) {
+            console.error('Error adding member:', err);
+            alert(err?.response?.data?.message || 'Failed to add member to team');
+        }
+    }
+
     return (
         <div className="container">
             <div className="page-header">
@@ -84,7 +154,7 @@ export default function Teams() {
                         <tr>
                             <th scope="col">Team Name</th>
                             <th scope="col">Team Members</th>
-                            <th scope="col">Company</th>
+                            <th scope="col">Actions</th>
                         </tr>
                     </thead>
 
@@ -92,8 +162,21 @@ export default function Teams() {
                         {rows.map((r) => (
                             <tr key={r.id}>
                                 <td>{r.name}</td>
-                                <td>{r.members || 'No members yet'}</td>
-                                <td>{r.company || 'My Company (San Francisco)'}</td>
+                                <td>
+                                    {r.members && r.members.length > 0 
+                                        ? r.members.map(m => m.name).join(', ')
+                                        : 'No members yet'
+                                    }
+                                </td>
+                                <td>
+                                    <button 
+                                        className="btn-secondary" 
+                                        style={{ fontSize: '13px', padding: '6px 12px' }}
+                                        onClick={() => openAddMember(r)}
+                                    >
+                                        Add Member
+                                    </button>
+                                </td>
                             </tr>
                         ))}
                     </tbody>
@@ -150,6 +233,46 @@ export default function Teams() {
                                 </button>
                                 <button className="btn-accent" type="submit">
                                     Submit
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {showAddMember && 
+                createPortal(
+                <div className="modal-overlay" onMouseDown={closeAddMember}>
+                    <div className="modal-content" onMouseDown={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+                        <h3>Add Member to {selectedTeam?.name}</h3>
+                        <p>Select a user to add to this team.</p>
+
+                        <form onSubmit={onAddMember}>
+                            <div className="input-group">
+                                <label>Select User *</label>
+                                <select
+                                    className="input-select modal-input"
+                                    value={memberForm.user_id}
+                                    onChange={onMemberChange}
+                                    required
+                                    style={{ marginBottom: 0 }}
+                                >
+                                    <option value="">-- Select a user --</option>
+                                    {users.map(user => (
+                                        <option key={user.id} value={user.id}>
+                                            {user.name} ({user.email}) - {user.role}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="modal-actions">
+                                <button className="btn-secondary" type="button" onClick={closeAddMember}>
+                                    Cancel
+                                </button>
+                                <button className="btn-accent" type="submit">
+                                    Add Member
                                 </button>
                             </div>
                         </form>

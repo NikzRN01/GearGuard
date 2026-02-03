@@ -3,6 +3,26 @@ const db = require('../database');
 
 const router = express.Router();
 
+// Get all users (for team member assignment)
+router.get('/users/all', (req, res) => {
+  try {
+    const users = db.prepare(`
+      SELECT 
+        id,
+        name,
+        email,
+        role
+      FROM users
+      ORDER BY name
+    `).all();
+    
+    res.json({ success: true, data: users });
+  } catch (error) {
+    console.error('Get users error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 // Get all teams
 router.get('/', (req, res) => {
   try {
