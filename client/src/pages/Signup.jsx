@@ -7,6 +7,7 @@ export default function Signup() {
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [userType, setUserType] = useState('user');
   const [password, setPassword] = useState('');
   const [reEnterPassword, setReEnterPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -51,7 +52,7 @@ export default function Signup() {
 
     setLoading(true);
     try {
-      const { data } = await api.post('/auth/signup', { name, email, password, reEnterPassword });
+      const { data } = await api.post('/auth/signup', { name, email, password, reEnterPassword, role: userType });
       if (data?.success) {
         setSuccess('Account created successfully!');
         setCountdown(3);
@@ -93,6 +94,19 @@ export default function Signup() {
       className={cardClass}
     >
       <form onSubmit={onSubmit} className="auth-form">
+        <div className="input-group">
+          <label htmlFor="userType">Sign Up As</label>
+          <select
+            id="userType"
+            value={userType}
+            onChange={(e) => setUserType(e.target.value)}
+            className="input-select"
+          >
+            <option value="user">User</option>
+            <option value="technician">Technician</option>
+          </select>
+        </div>
+
         <div className="signup-grid">
           <div className="input-group">
             <label htmlFor="name">Full Name</label>

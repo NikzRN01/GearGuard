@@ -7,6 +7,7 @@ export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [userType, setUserType] = useState('user');
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -22,7 +23,7 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      const { data } = await api.post('/auth/login', { email, password });
+      const { data } = await api.post('/auth/login', { email, password, role: userType });
       if (data?.success) {
         // store minimal user session for demo
         sessionStorage.setItem('user', JSON.stringify(data.user));
@@ -86,6 +87,19 @@ export default function Login() {
         className={cardClass}
       >
         <form onSubmit={onSubmit} className="auth-form">
+        <div className="input-group">
+          <label htmlFor="userType">Login As</label>
+          <select
+            id="userType"
+            value={userType}
+            onChange={(e) => setUserType(e.target.value)}
+            className="input-select"
+          >
+            <option value="user">User</option>
+            <option value="technician">Technician</option>
+          </select>
+        </div>
+
         <div className="input-group">
           <label htmlFor="email">Email Address</label>
           <input 

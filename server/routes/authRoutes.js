@@ -121,7 +121,7 @@ router.post('/signup', async (req, res) => {
 // Login Route
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
 
     // Validate required fields
     if (!email || !password) {
@@ -146,6 +146,14 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({
         success: false,
         message: 'Invalid password'
+      });
+    }
+
+    // Check if user role matches the login role
+    if (role && user.role !== role) {
+      return res.status(403).json({
+        success: false,
+        message: `This account is registered as a ${user.role}, not a ${role}`
       });
     }
 
