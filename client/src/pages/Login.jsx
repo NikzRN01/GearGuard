@@ -27,7 +27,13 @@ export default function Login() {
       if (data?.success) {
         // store minimal user session for demo
         sessionStorage.setItem('user', JSON.stringify(data.user));
-        navigate('/app');
+        const role = data?.user?.role;
+        const destination = role === 'technician'
+          ? '/app/technician'
+          : (role === 'admin' || role === 'manager')
+            ? '/app/admin'
+            : '/app';
+        navigate(destination);
       } else {
         setError(data?.message || 'Login failed');
       }
@@ -97,6 +103,8 @@ export default function Login() {
           >
             <option value="user">User</option>
             <option value="technician">Technician</option>
+            <option value="manager">Manager</option>
+            <option value="admin">Admin</option>
           </select>
         </div>
 

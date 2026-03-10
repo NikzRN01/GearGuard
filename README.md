@@ -1,127 +1,184 @@
-# GearGuard
+<div align="center">
 
-GearGuard is a simple maintenance management portal built for the Odoo Virtual Hackathon.
+# 🛠️ GearGuard
 
-https://gearguardodoo.vercel.app
- 
-It consists of:
-- **Client**: React + Vite (UI)
-- **Server**: Node.js + Express + SQLite (API + persistence)
+### Intelligent Maintenance Management System
 
----
+[![Live Demo](https://img.shields.io/badge/demo-live-success?style=for-the-badge)](https://gearguardodoo.vercel.app)
+[![Node.js](https://img.shields.io/badge/Node.js-20.x-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
+[![License](https://img.shields.io/badge/license-ISC-blue?style=for-the-badge)](LICENSE)
 
-## Tech Stack
+**A comprehensive maintenance management portal built for the Odoo Virtual Hackathon**
 
-**Frontend**
-- React 18
-- Vite
-- React Router
-- Axios
+[Features](#-features) • [Quick Start](#-quick-start) • [API Reference](#-api-reference) • [Demo](#-demo-accounts)
 
-**Backend**
-- Express
-- SQLite (via `better-sqlite3`)
-- bcrypt (password hashing)
-- nodemailer (password reset email)
-- dotenv (environment variables)
+</div>
 
 ---
 
-## Project Structure
+## 📋 Table of Contents
 
+- [Overview](#-overview)
+- [Features](#-features)
+- [Tech Stack](#-tech-stack)
+- [Quick Start](#-quick-start)
+- [API Reference](#-api-reference)
+- [User Roles](#-user-roles)
+- [Deployment](#-deployment)
+
+---
+
+## 🎯 Overview
+
+**GearGuard** is a modern, full-stack maintenance management system designed to streamline equipment maintenance workflows, team coordination, and preventive maintenance scheduling. Built with React and Node.js, it provides an intuitive interface for managing maintenance requests, tracking equipment health, and optimizing maintenance team operations.
+
+### 🌟 Why GearGuard?
+
+- **Centralized Management**: Single platform for all maintenance operations
+- **Real-time Tracking**: Monitor maintenance requests from creation to completion
+- **Team Collaboration**: Assign tasks, track progress, and manage maintenance teams
+- **Preventive Maintenance**: Schedule and track preventive maintenance to reduce downtime
+- **Work Center Integration**: Manage work centers and their alternative configurations
+- **Calendar View**: Visual scheduling for maintenance activities
+
+---
+
+## ✨ Features
+
+### 🔐 Authentication & User Management
+- ✅ Secure user registration and login
+- ✅ Role-based access control (Admin, Manager, Technician, User)
+- ✅ Password reset via email
+- ✅ Session management
+
+### 📊 Dashboard & Analytics
+- ✅ Real-time maintenance request overview
+- ✅ Critical equipment monitoring
+- ✅ Technician workload tracking
+- ✅ Open requests summary
+- ✅ Role-specific dashboards (Manager vs Technician views)
+
+### 🔧 Maintenance Request Management
+- ✅ Create corrective and preventive maintenance requests
+- ✅ Link requests to equipment or work centers
+- ✅ Status workflow: New → In Progress → Repaired/Scrap
+- ✅ Assign requests to technicians
+- ✅ Add notes and track duration
+- ✅ Filter by status, type, team, and date
+
+### 📅 Maintenance Calendar
+- ✅ Week and month views
+- ✅ Visual scheduling of preventive maintenance
+- ✅ Date range filtering
+
+### 🏭 Equipment Management
+- ✅ Track machines and tools inventory
+- ✅ Serial number management
+- ✅ Department and location tracking
+- ✅ Warranty tracking
+- ✅ Assign maintenance teams to equipment
+- ✅ Equipment categorization
+
+### 👥 Team Management
+- ✅ Create and manage maintenance teams
+- ✅ Add/remove team members
+- ✅ Role-based team assignments
+- ✅ View team workload
+
+### 🏢 Work Center Management
+- ✅ Define work centers with operational metrics
+- ✅ Track cost per hour and capacity
+- ✅ Monitor time efficiency and OEE targets
+- ✅ Configure alternative work centers
+
+---
+
+## 🛠️ Tech Stack
+
+### Frontend
+- **React** 18.3.1 - UI Framework
+- **Vite** 5.0.10 - Build Tool & Dev Server
+- **React Router** 6.28.0 - Client-side Routing
+- **Axios** 1.7.7 - HTTP Client
+
+### Backend
+- **Node.js** 20.x - Runtime Environment
+- **Express** 4.18.2 - Web Framework
+- **SQLite** (better-sqlite3 9.2.2) - Database
+- **bcrypt** 5.1.1 - Password Hashing
+- **nodemailer** 6.9.7 - Email Service
+- **dotenv** 16.6.1 - Environment Variables
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Node.js** 18.x or higher ([Download](https://nodejs.org/))
+- **npm** (comes with Node.js)
+
+### Installation
+
+**1. Clone the repository**
+```bash
+git clone https://github.com/yourusername/gearguard.git
+cd gearguard
 ```
-client/   # Vite + React app
-server/   # Express API + SQLite database
-```
 
----
-
-## Prerequisites
-
-- Node.js 18+ recommended
-- npm
-
----
-
-## Getting Started (Local Development)
-
-### 1) Backend (Express API)
-
-From the repository root:
-
+**2. Set up the Backend**
 ```bash
 cd server
 npm install
 ```
 
-Create a `.env` file inside `server/`:
+**3. Configure Environment Variables**
 
+Create a `.env` file in the `server/` directory:
 ```env
-# Server
+# Server Configuration
 PORT=5000
 
-# Email (used for password reset)
-# NOTE: Uses Gmail transport in current code.
-SMTP_USER=your_gmail_address@gmail.com
-SMTP_PASS=your_gmail_app_password
+# Email Configuration (Gmail)
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_app_password
 ```
 
-Start the API:
+> **Note**: For Gmail, generate an [App Password](https://support.google.com/accounts/answer/185833)
 
+**4. Start the Backend Server**
 ```bash
-npm run dev
-# or
-npm start
+npm run dev    # Development mode with auto-reload
+# OR
+npm start      # Production mode
 ```
 
-Health check:
+Server runs at `http://localhost:5000`
 
-- `GET http://localhost:5000/api/health`
-
-> The SQLite database file is created automatically at `server/portal.db` on first run.
-
----
-
-### 2) Frontend (React + Vite)
-
-From the repository root:
-
+**5. Set up the Frontend** (in a new terminal)
 ```bash
 cd client
 npm install
 ```
 
-(Optional) Configure API base URL. Create `client/.env`:
+**6. Configure Frontend Environment** (Optional)
 
+Create a `.env` file in the `client/` directory:
 ```env
 VITE_API_BASE_URL=http://localhost:5000/api
 ```
 
-Start the UI:
-
+**7. Start the Frontend**
 ```bash
 npm run dev
 ```
 
-By default, Vite runs at:
-- `http://localhost:5173`
+App opens at `http://localhost:5173`
 
----
+### 🎉 You're Ready!
 
-## App Routes (Frontend)
-
-The client uses React Router:
-
-- `/login` – Login
-- `/signup` – Signup
-- `/reset-password` – Reset Password page
-- `/app` – Main authenticated layout
-  - `/app` – Dashboard
-  - `/app/calendar` – Maintenance Calendar
-  - `/app/equipment/work-center` – Work Centers
-  - `/app/equipment/machine-tools` – Machines & Tools
-  - `/app/requests` – Maintenance Requests
-  - `/app/teams` – Teams
+Visit `http://localhost:5173` and create your first account!
 
 ---
 

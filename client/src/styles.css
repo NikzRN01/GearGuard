@@ -3300,3 +3300,278 @@ a {
 .tech-view-btn:active {
     transform: translateY(0);
 }
+
+/* Admin dashboard */
+.admin-kpi-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.admin-kpi-card {
+    border-left: 3px solid rgba(90, 166, 255, 0.55);
+}
+
+.admin-kpi-sub {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+.admin-analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 14px;
+    margin-bottom: 14px;
+}
+
+.admin-chart-card {
+    background: linear-gradient(165deg, rgba(15, 22, 38, 0.8), rgba(16, 29, 52, 0.56));
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 14px 30px rgba(0, 0, 0, 0.24);
+}
+
+.admin-chart-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.admin-chart-head h3 {
+    margin: 0;
+    font-size: 16px;
+}
+
+.admin-chart-empty {
+    color: var(--muted);
+    padding: 18px 0;
+    text-align: center;
+}
+
+.admin-donut-wrap {
+    display: grid;
+    grid-template-columns: 170px 1fr;
+    gap: 14px;
+    align-items: center;
+}
+
+.admin-donut-shell {
+    position: relative;
+    width: 168px;
+    height: 168px;
+    margin: 0 auto;
+}
+
+.admin-donut {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 20px 26px rgba(0, 0, 0, 0.3);
+    animation: adminChartEnter 620ms ease both;
+}
+
+.admin-donut::after {
+    content: "";
+    position: absolute;
+    inset: 18px;
+    border-radius: 50%;
+    background: rgba(11, 18, 32, 0.88);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.admin-donut-center {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    text-align: center;
+    pointer-events: none;
+}
+
+.admin-donut-total {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.admin-donut-sub {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: 0.2px;
+}
+
+.admin-legend {
+    display: grid;
+    gap: 8px;
+}
+
+.admin-legend-item {
+    display: grid;
+    grid-template-columns: 11px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.admin-legend-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 999px;
+}
+
+.admin-legend-name {
+    text-transform: capitalize;
+}
+
+.admin-legend-pct {
+    color: var(--muted);
+}
+
+.admin-trend-card {
+    grid-column: span 2;
+}
+
+.admin-trend-svg {
+    width: 100%;
+    height: 210px;
+    display: block;
+}
+
+.admin-trend-dot {
+    fill: #d9ecff;
+    stroke: rgba(90, 166, 255, 0.6);
+    stroke-width: 2;
+}
+
+.admin-trend-axis {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: -4px;
+}
+
+.admin-trend-day {
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    display: grid;
+    gap: 2px;
+}
+
+.admin-trend-day strong {
+    color: var(--text);
+    font-size: 13px;
+}
+
+.admin-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+}
+
+.admin-bar-row {
+    display: grid;
+    grid-template-columns: 120px 1fr 30px;
+    align-items: center;
+    gap: 10px;
+}
+
+.admin-bar-label {
+    color: var(--text);
+    font-size: 12px;
+    text-transform: capitalize;
+}
+
+.admin-team-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.admin-bar-track {
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+
+.admin-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(90, 166, 255, 0.9), rgba(159, 209, 255, 0.9));
+    animation: adminGrow 720ms ease both;
+    transform-origin: left;
+}
+
+.admin-team-fill {
+    background: linear-gradient(90deg, rgba(54, 167, 109, 0.9), rgba(98, 224, 165, 0.9));
+}
+
+.admin-status-new {
+    background: linear-gradient(90deg, rgba(220, 75, 90, 0.9), rgba(244, 114, 128, 0.9));
+}
+
+.admin-status-in_progress {
+    background: linear-gradient(90deg, rgba(245, 158, 11, 0.9), rgba(251, 191, 36, 0.9));
+}
+
+.admin-status-on_hold {
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0.9), rgba(129, 140, 248, 0.9));
+}
+
+.admin-status-completed,
+.admin-status-repaired {
+    background: linear-gradient(90deg, rgba(47, 122, 72, 0.9), rgba(74, 222, 128, 0.9));
+}
+
+.admin-status-scrap {
+    background: linear-gradient(90deg, rgba(107, 114, 128, 0.9), rgba(156, 163, 175, 0.9));
+}
+
+.admin-bar-value {
+    text-align: right;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+@keyframes adminGrow {
+    from {
+        transform: scaleX(0.2);
+        opacity: 0.3;
+    }
+
+    to {
+        transform: scaleX(1);
+        opacity: 1;
+    }
+}
+
+@keyframes adminChartEnter {
+    from {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@media (max-width: 760px) {
+    .admin-bar-row {
+        grid-template-columns: 95px 1fr 26px;
+        gap: 8px;
+    }
+
+    .admin-donut-wrap {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-trend-card {
+        grid-column: auto;
+    }
+}

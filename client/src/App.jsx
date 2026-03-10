@@ -13,6 +13,7 @@ export default function App() {
   }, []);
 
   const isTechnician = user?.role === 'technician';
+  const isAdmin = user?.role === 'admin' || user?.role === 'manager';
 
   return (
     <div className="app-layout">
@@ -32,7 +33,7 @@ export default function App() {
           </>
         ) : (
           <>
-            <NavLink to="/app" end>Home</NavLink>
+            <NavLink to={isAdmin ? '/app/admin' : '/app'} end>{isAdmin ? 'Admin Dashboard' : 'Home'}</NavLink>
             <NavLink to="/app/calendar">Maintenance Calendar</NavLink>
             <details className="sidebar-dropdown" open={isEquipmentPage}>
               <summary>
