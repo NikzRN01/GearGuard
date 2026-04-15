@@ -23,6 +23,23 @@ app.use('/api/teams', teamRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/work-centers', workCenterRoutes);
 
+// Base routes for platform checks and manual browser visits
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'GearGuard backend is running',
+    health: '/api/health'
+  });
+});
+
+app.get('/api', (req, res) => {
+  res.json({
+    success: true,
+    message: 'GearGuard API is running',
+    health: '/api/health'
+  });
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'Server is running', timestamp: new Date() });
