@@ -149,7 +149,7 @@ export default function Teams() {
             </div>
 
             <div className="table-wrap">
-                <table className="table" style={{ minWidth: 720 }}>
+                <table className="table teams-table-main">
                     <thead>
                         <tr>
                             <th scope="col">Team Name</th>

@@ -83,8 +83,7 @@ const DashboardHome = () => {
 
         <div className="page-actions">
           <input
-            className="modal-input"
-            style={{ marginBottom: 0, width: 240 }}
+            className="modal-input page-control page-control-sm"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search"
@@ -92,8 +91,7 @@ const DashboardHome = () => {
           />
 
           <select
-            className="modal-input"
-            style={{ marginBottom: 0, width: 260 }}
+            className="modal-input page-control page-control-md"
             value={company}
             onChange={(e) => setCompany(e.target.value)}
             aria-label="Company"

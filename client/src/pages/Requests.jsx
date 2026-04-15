@@ -392,7 +392,7 @@ export default function Requests() {
 			</div>
 
 			<div className="table-wrap" style={{ marginTop: 10 }}>
-				<table className="table" style={{ minWidth: 860 }}>
+				<table className="table requests-table">
 					<thead>
 						<tr>
 							<th scope="col">Subject</th>

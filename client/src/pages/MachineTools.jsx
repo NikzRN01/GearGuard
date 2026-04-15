@@ -114,8 +114,7 @@ export default function MachineTools() {
 
                 <div className="page-actions">
                     <input
-                        className="modal-input"
-                        style={{ marginBottom: 0, width: 260 }}
+                        className="modal-input page-control page-control-md"
                         type="search"
                         placeholder="Search"
                         value={query}

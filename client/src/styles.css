@@ -3929,3 +3929,286 @@ a {
         grid-column: auto;
     }
 }
+
+/* Shared responsive control widths */
+.page-control {
+    margin-bottom: 0;
+    min-width: 0;
+}
+
+.page-control-sm {
+    width: min(240px, 100%);
+}
+
+.page-control-md {
+    width: min(260px, 100%);
+}
+
+.requests-table {
+    min-width: 760px;
+}
+
+.teams-table-main {
+    min-width: 640px;
+}
+
+/* Mobile + tablet responsive behavior */
+@media (max-width: 1024px) {
+    .app-main {
+        padding: 20px;
+    }
+
+    .container {
+        padding: 16px;
+    }
+
+    .calendar-content {
+        grid-template-columns: 1fr;
+    }
+
+    .calendar-mini {
+        position: static;
+        order: -1;
+    }
+
+    .request-top-bar {
+        flex-wrap: wrap;
+        align-items: stretch;
+    }
+
+    .status-timeline {
+        order: 3;
+        width: 100%;
+        justify-content: flex-start;
+        overflow-x: auto;
+        padding-bottom: 2px;
+    }
+
+    .status-phase {
+        min-width: 86px;
+    }
+}
+
+@media (max-width: 900px) {
+    .app-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .app-sidebar {
+        position: sticky;
+        top: 0;
+        min-height: auto;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding: 10px 12px;
+        gap: 8px;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .app-sidebar .brand {
+        margin: 0;
+        align-self: center;
+        flex: 0 0 auto;
+        font-size: 20px;
+        padding: 0 6px;
+    }
+
+    .app-sidebar a,
+    .app-sidebar summary,
+    .sidebar-logout {
+        flex: 0 0 auto;
+        white-space: nowrap;
+        text-align: center;
+    }
+
+    .sidebar-dropdown {
+        flex: 0 0 auto;
+    }
+
+    .sidebar-submenu {
+        min-width: 190px;
+    }
+
+    .sidebar-logout {
+        margin-top: 0;
+        width: auto;
+    }
+
+    .page-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .page-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .page-control,
+    .page-control-sm,
+    .page-control-md {
+        width: 100%;
+        flex: 1 1 220px;
+    }
+
+    .calendar-main {
+        padding: 14px;
+    }
+
+    .calendar-grid {
+        max-height: 560px;
+    }
+
+    .request-layout {
+        margin: 18px 0;
+        gap: 14px;
+    }
+
+    .request-form-panel,
+    .request-details-panel {
+        padding: 16px;
+    }
+
+    .modal-content,
+    .modal-content.request-modal,
+    .equipment-modal {
+        width: min(94vw, 920px);
+        max-width: 94vw;
+    }
+}
+
+@media (max-width: 640px) {
+    .app-main {
+        padding: 14px;
+    }
+
+    .container h1 {
+        font-size: 20px;
+    }
+
+    .page-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .page-actions .btn-accent,
+    .page-actions .btn-secondary,
+    .request-top-bar .btn-new,
+    .request-top-bar .btn-secondary {
+        width: 100%;
+    }
+
+    .request-top-bar {
+        padding: 12px;
+        gap: 10px;
+    }
+
+    .status-alert-dots {
+        justify-content: flex-start;
+        margin: 10px 0 14px;
+        padding-right: 0;
+    }
+
+    .tab-content,
+    .request-modal .modal-header,
+    .worksheet-header,
+    .modal-actions {
+        flex-wrap: wrap;
+    }
+
+    .modal-actions {
+        justify-content: stretch;
+    }
+
+    .modal-actions .btn-secondary,
+    .modal-actions .btn-accent,
+    .modal-actions .btn-new {
+        width: 100%;
+    }
+
+    .admin-analytics-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-chart-card {
+        padding: 12px;
+    }
+
+    .admin-chart-head {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .admin-trend-svg {
+        height: 170px;
+    }
+
+    .calendar-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .calendar-controls {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .calendar-nav-btn,
+    .calendar-view-select {
+        flex: 1 1 130px;
+    }
+
+    .calendar-grid {
+        grid-template-columns: 56px 1fr;
+        max-height: 520px;
+    }
+
+    .time-slot {
+        font-size: 10px;
+        padding-right: 8px;
+    }
+
+    .day-number {
+        width: 30px;
+        height: 30px;
+        font-size: 13px;
+    }
+
+    .table {
+        min-width: 720px;
+    }
+
+    .teams-table-main {
+        min-width: 620px;
+    }
+
+    .requests-table {
+        min-width: 700px;
+    }
+}
+
+@media (max-width: 420px) {
+    .container {
+        padding: 12px;
+    }
+
+    .request-title {
+        font-size: 18px;
+    }
+
+    .calendar-grid {
+        grid-template-columns: 50px 1fr;
+    }
+
+    .modal-content,
+    .equipment-modal {
+        padding: 16px;
+    }
+}
