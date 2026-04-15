@@ -3,7 +3,15 @@ const path = require('path');
 const bcrypt = require('bcrypt');
 
 // Initialize database
-const db = new Database(path.join(__dirname, 'portal.db'));
+const dbFilePath = process.env.VERCEL
+  ? path.join('/tmp', 'portal.db')
+  : path.join(__dirname, 'portal.db');
+
+const db = new Database(dbFilePath);
+
+if (process.env.VERCEL) {
+  console.warn('Using /tmp SQLite database on Vercel. Data is ephemeral between cold starts.');
+}
 
 // Create users table
 const createUsersTable = () => {

@@ -28,8 +28,13 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'Server is running', timestamp: new Date() });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/api/health`);
-});
+// Export app for serverless runtimes (Vercel)
+module.exports = app;
+
+// Start server only in local/non-serverless environments
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/api/health`);
+  });
+}
