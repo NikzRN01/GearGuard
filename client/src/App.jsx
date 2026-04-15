@@ -1,8 +1,9 @@
 import React from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 
 export default function App() {
+  const navigate = useNavigate();
   const location = useLocation();
   const isEquipmentPage = location.pathname.startsWith('/app/equipment');
   
@@ -14,6 +15,11 @@ export default function App() {
 
   const isTechnician = user?.role === 'technician';
   const isAdmin = user?.role === 'admin' || user?.role === 'manager';
+
+  const handleLogout = React.useCallback(() => {
+    sessionStorage.removeItem('user');
+    navigate('/login');
+  }, [navigate]);
 
   return (
     <div className="app-layout">
@@ -59,6 +65,10 @@ export default function App() {
             <NavLink to="/app/teams">Teams</NavLink>
           </>
         )}
+
+        <button type="button" className="sidebar-logout" onClick={handleLogout}>
+          Logout
+        </button>
       </aside>
 
       <main className="app-main">

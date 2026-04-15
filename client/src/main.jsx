@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import App from './App.jsx';
 import Login from './pages/Login.jsx';
 import Signup from './pages/Signup.jsx';
+import Landing from './pages/Landing.jsx';
 import DashboardHome from './pages/DashboardHome.jsx';
 import TechnicianDashboard from './pages/TechnicianDashboard.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
@@ -39,7 +40,7 @@ root.render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/reset-password" element={<ResetPassword />} />
