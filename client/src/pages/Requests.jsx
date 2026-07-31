@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import { api } from '../services/api';
+import SelectMenu from '../components/ui/SelectMenu';
 
 const getSessionUser = () => {
 	try {
@@ -31,7 +33,8 @@ export default function Requests() {
 		const sp = new URLSearchParams(location?.search || '');
 		const equipment_id = sp.get('equipment_id') || '';
 		const work_center_id = sp.get('work_center_id') || '';
-		return { equipment_id, work_center_id };
+		const request_id = sp.get('request_id') || '';
+		return { equipment_id, work_center_id, request_id };
 	}, [location?.search]);
 
 	const [loading, setLoading] = useState(false);
@@ -95,9 +98,16 @@ export default function Requests() {
 				...(opts?.work_center_id ? { work_center_id: opts.work_center_id } : {}),
 			};
 			const { data } = await api.get('/maintenance', { params });
-			const list = data?.data || [];
+			const sourceList = data?.data || [];
+			const list = user?.role === 'technician'
+				? sourceList.filter((request) => Number(request.assigned_to_user_id) === Number(user?.id))
+				: sourceList;
 			setRequests(list);
-			if (activeRequest?.id && list.some((r) => r.id === activeRequest.id)) return;
+			if (opts?.request_id) {
+				setActiveRequest(list.find((request) => Number(request.id) === Number(opts.request_id)) || list[0] || null);
+				return;
+			}
+			if (activeRequest?.id && list.some((r) => Number(r.id) === Number(activeRequest.id))) return;
 			setActiveRequest(list[0] || null);
 		} catch (e) {
 			setError(e?.response?.data?.message || 'Failed to load requests');
@@ -121,6 +131,15 @@ export default function Requests() {
 	}, []);
 
 	useEffect(() => {
+		if (!showNewModal && !showCompleteModal) return undefined;
+		const previousOverflow = document.body.style.overflow;
+		document.body.style.overflow = 'hidden';
+		return () => {
+			document.body.style.overflow = previousOverflow;
+		};
+	}, [showNewModal, showCompleteModal]);
+
+	useEffect(() => {
 		loadRequestsList(scope);
 		// Open New modal if navigated from Dashboard or a deep link
 		if (location?.state?.openNew) {
@@ -129,7 +148,7 @@ export default function Requests() {
 			setShowNewModal(true);
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [scope.equipment_id, scope.work_center_id]);
+	}, [scope.equipment_id, scope.work_center_id, scope.request_id]);
 
 	useEffect(() => {
 		if (!activeRequest) {
@@ -302,7 +321,7 @@ export default function Requests() {
 	};
 
 	return (
-		<div className="container">
+		<div className={`container ${user?.role === 'technician' ? 'technician-requests-page' : ''}`}>
 			<div className="page-header">
 				<div>
 					<h1>Requests</h1>
@@ -330,12 +349,12 @@ export default function Requests() {
 								Assign to me
 							</button>
 						)}
-						{activeRequest.assigned_to_user_id === user?.id && activeRequest.status === 'new' && (
+						{Number(activeRequest.assigned_to_user_id) === Number(user?.id) && activeRequest.status === 'new' && (
 							<button className="btn-secondary" type="button" onClick={() => updateStatus('in_progress')}>
 								Start Work
 							</button>
 						)}
-						{activeRequest.assigned_to_user_id === user?.id && activeRequest.status === 'in_progress' && (
+						{Number(activeRequest.assigned_to_user_id) === Number(user?.id) && activeRequest.status === 'in_progress' && (
 							<button
 								className="btn-secondary"
 								type="button"
@@ -372,27 +391,9 @@ export default function Requests() {
 			</div>
 
 			<div className="status-alert-dots">
-				<button
-					type="button"
-					className={`alert-dot in-progress ${alertStatus === 'in-progress' ? 'active' : ''}`}
-					onClick={() => setAlertStatus('in-progress')}
-					title="In Progress"
-					aria-label="In Progress"
-				></button>
-				<button
-					type="button"
-					className={`alert-dot blocked ${alertStatus === 'blocked' ? 'active' : ''}`}
-					onClick={() => setAlertStatus('blocked')}
-					title="Blocked"
-					aria-label="Blocked"
-				></button>
-				<button
-					type="button"
-					className={`alert-dot ready ${alertStatus === 'ready' ? 'active' : ''}`}
-					onClick={() => setAlertStatus('ready')}
-					title="Ready"
-					aria-label="Ready"
-				></button>
+				<button type="button" className={`alert-dot in-progress ${alertStatus === 'in-progress' ? 'active' : ''}`} onClick={() => setAlertStatus('in-progress')} title="In Progress" aria-label="In Progress" />
+				<button type="button" className={`alert-dot blocked ${alertStatus === 'blocked' ? 'active' : ''}`} onClick={() => setAlertStatus('blocked')} title="Blocked" aria-label="Blocked" />
+				<button type="button" className={`alert-dot ready ${alertStatus === 'ready' ? 'active' : ''}`} onClick={() => setAlertStatus('ready')} title="Ready" aria-label="Ready" />
 			</div>
 
 			<div className="table-wrap" style={{ marginTop: 10 }}>
@@ -628,7 +629,9 @@ export default function Requests() {
 				</div>
 			</div>
 
-			{showNewModal && (
+			{showNewModal && createPortal(
+				<div className="manager-shell technician-shell technician-modal-portal">
+				<div className="technician-requests-page">
 				<div
 					className="modal-overlay"
 					onMouseDown={(e) => {
@@ -693,19 +696,13 @@ export default function Requests() {
 
 								<div className="field">
 									<label>Equipment</label>
-									<select
-										className="form-input"
+									<SelectMenu
+										ariaLabel="Select equipment"
 										value={newRequest.equipment_id}
-										onChange={(e) => onSelectEquipment(e.target.value)}
+										onChange={onSelectEquipment}
 										disabled={Boolean(newRequest.work_center_id)}
-									>
-										<option value="">Select equipment</option>
-										{equipmentOptions.map((eq) => (
-											<option key={eq.id} value={eq.id}>
-												{eq.name}{eq.serial_number ? ` / ${eq.serial_number}` : ''}
-											</option>
-										))}
-									</select>
+										options={[{ value: '', label: 'Select equipment' }, ...equipmentOptions.map((eq) => ({ value: String(eq.id), label: `${eq.name}${eq.serial_number ? ` / ${eq.serial_number}` : ''}` }))]}
+									/>
 									{Boolean(newRequest.work_center_id) && (
 										<p className="muted" style={{ marginTop: 6, marginBottom: 0 }}>
 											Clear Work Center to choose equipment.
@@ -715,19 +712,13 @@ export default function Requests() {
 
 								<div className="field">
 									<label>Work Center</label>
-									<select
-										className="form-input"
+									<SelectMenu
+										ariaLabel="Select work center"
 										value={newRequest.work_center_id}
-										onChange={(e) => onSelectWorkCenter(e.target.value)}
+										onChange={onSelectWorkCenter}
 										disabled={Boolean(newRequest.equipment_id)}
-									>
-										<option value="">Select work center</option>
-										{workCenterOptions.map((wc) => (
-											<option key={wc.id} value={wc.id}>
-												{wc.name}
-											</option>
-										))}
-									</select>
+										options={[{ value: '', label: 'Select work center' }, ...workCenterOptions.map((wc) => ({ value: String(wc.id), label: wc.name }))]}
+									/>
 									{Boolean(newRequest.equipment_id) && (
 										<p className="muted" style={{ marginTop: 6, marginBottom: 0 }}>
 											Clear Equipment to choose work center.
@@ -788,6 +779,9 @@ export default function Requests() {
 						</form>
 					</div>
 				</div>
+				</div>
+				</div>,
+				document.body
 			)}
 
 			{showCompleteModal && (
@@ -879,16 +873,22 @@ export default function Requests() {
 
 			{/* Tabs */}
 			<div className="tabs-section">
-				<div className="tabs-header">
+				<div className="tabs-header" role="tablist" aria-label="Request notes and instructions">
 					<button
 						className={`tab-btn ${activeTab === 'notes' ? 'active' : ''}`}
 						onClick={() => setActiveTab('notes')}
+						role="tab"
+						aria-selected={activeTab === 'notes'}
+						aria-controls="request-notes-panel"
 					>
 						Notes
 					</button>
 					<button
 						className={`tab-btn ${activeTab === 'instructions' ? 'active' : ''}`}
 						onClick={() => setActiveTab('instructions')}
+						role="tab"
+						aria-selected={activeTab === 'instructions'}
+						aria-controls="request-instructions-panel"
 					>
 						Instructions
 					</button>
@@ -896,6 +896,7 @@ export default function Requests() {
 				<div className="tab-content">
 					{activeTab === 'notes' && (
 						<textarea
+							id="request-notes-panel"
 							className="notes-textarea"
 							placeholder="Add notes here..."
 							defaultValue=""
@@ -903,6 +904,7 @@ export default function Requests() {
 					)}
 					{activeTab === 'instructions' && (
 						<textarea
+							id="request-instructions-panel"
 							className="notes-textarea"
 							placeholder="Add instructions here..."
 							defaultValue=""

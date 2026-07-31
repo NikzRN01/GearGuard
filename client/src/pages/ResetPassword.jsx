@@ -6,8 +6,7 @@ import AuthCard from '../shared/AuthCard';
 export default function ResetPassword() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [email, setEmail] = useState('');
-  const [token, setToken] = useState('');
+  const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -16,19 +15,18 @@ export default function ResetPassword() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Both parts of the emailed link are required: the token is what proves the
-  // request came from the account owner.
+  // The token is the whole credential: it proves the request came from the
+  // account owner and tells the API which account to reset.
   useEffect(() => {
-    const emailParam = searchParams.get('email');
     const tokenParam = searchParams.get('token');
-    setEmail(emailParam || '');
-    setToken(tokenParam || '');
-    if (!emailParam || !tokenParam) {
+    if (tokenParam) {
+      setResetToken(tokenParam);
+    } else {
       setError('Invalid reset link. Please request a new password reset.');
     }
   }, [searchParams]);
 
-  const linkIsValid = Boolean(email && token);
+  const linkIsValid = Boolean(resetToken);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -44,8 +42,7 @@ export default function ResetPassword() {
 
     try {
       const { data } = await api.post('/auth/reset-password', {
-        email,
-        token,
+        token: resetToken,
         newPassword,
         confirmPassword
       });
@@ -61,8 +58,6 @@ export default function ResetPassword() {
     } catch (err) {
       if (err?.code === 'ERR_NETWORK') {
         setError('Unable to connect to server. Please check your connection.');
-      } else if (err?.response?.status === 404) {
-        setError('Account not found. Please check your email address.');
       } else if (err?.response?.status === 400) {
         setError(err?.response?.data?.message || 'Invalid input. Please check your passwords.');
       } else {
@@ -82,20 +77,6 @@ export default function ResetPassword() {
       className={cardClass}
     >
       <form onSubmit={onSubmit} className="auth-form">
-        <div className="input-group">
-          <label htmlFor="email">Email Address</label>
-          <input 
-            id="email"
-            type="email" 
-            value={email} 
-            onChange={(e) => setEmail(e.target.value)} 
-            placeholder="you@company.com"
-            disabled
-            required
-            style={{ backgroundColor: 'var(--gg-color-surface-subtle)', cursor: 'not-allowed' }}
-          />
-        </div>
-
         <div className="input-group">
           <label htmlFor="newPassword">New Password</label>
           <div className="password-input">

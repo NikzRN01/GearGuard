@@ -13,8 +13,12 @@ const {
   route,
   isUniqueViolation
 } = require('../lib/validation');
+const { authorize } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Admins are governance-only: they read reports, they do not run operations.
+router.use(authorize('user', 'technician', 'manager'));
 
 /** Fields a client may set, with the validator each one is put through. */
 const parseEquipmentFields = (body = {}) => ({
@@ -92,7 +96,7 @@ router.get('/:id', route((req, res) => {
 }));
 
 // Create new equipment
-router.post('/', route((req, res) => {
+router.post('/', authorize('manager', 'admin'), route((req, res) => {
   const body = req.body || {};
 
   // Validate required fields
@@ -145,7 +149,7 @@ router.post('/', route((req, res) => {
 // Update equipment.
 // Only the fields present in the body are written, so a partial update cannot
 // silently blank out columns the caller never mentioned.
-router.put('/:id', route((req, res) => {
+router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
   const id = toId(req.params.id);
   if (!id) throw notFound('Equipment not found');
 
@@ -197,7 +201,7 @@ router.put('/:id', route((req, res) => {
 }));
 
 // Delete equipment
-router.delete('/:id', route((req, res) => {
+router.delete('/:id', authorize('manager', 'admin'), route((req, res) => {
   const id = toId(req.params.id);
   if (!id) throw notFound('Equipment not found');
 

@@ -15,8 +15,12 @@ const {
   route,
   isUniqueViolation
 } = require('../lib/validation');
+const { authorize } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Admins are governance-only: they read reports, they do not run operations.
+router.use(authorize('user', 'technician', 'manager'));
 
 const STATUSES = ['active', 'inactive'];
 
@@ -91,7 +95,7 @@ router.get('/:id', route((req, res) => {
 }));
 
 // Create work center
-router.post('/', route((req, res) => {
+router.post('/', authorize('manager', 'admin'), route((req, res) => {
   const body = req.body || {};
   const name = requiredString(body.name, 'Name', LIMITS.name);
   const fields = parseWorkCenterFields(body);
@@ -133,7 +137,7 @@ router.post('/', route((req, res) => {
 }));
 
 // Update work center. Only supplied fields are written.
-router.put('/:id', route((req, res) => {
+router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
   const wc = findWorkCenter(req.params.id);
   const fields = parseWorkCenterFields(req.body || {});
 
@@ -170,7 +174,7 @@ router.put('/:id', route((req, res) => {
 }));
 
 // Soft delete (deactivate) work center
-router.delete('/:id', route((req, res) => {
+router.delete('/:id', authorize('manager', 'admin'), route((req, res) => {
   const wc = findWorkCenter(req.params.id);
   db.prepare("UPDATE work_centers SET status = 'inactive' WHERE id = ?").run(wc.id);
   res.json({ success: true, message: 'Work center deactivated' });
@@ -189,7 +193,7 @@ router.get('/:id/alternatives', route((req, res) => {
   res.json({ success: true, data: rows });
 }));
 
-router.post('/:id/alternatives', route((req, res) => {
+router.post('/:id/alternatives', authorize('manager', 'admin'), route((req, res) => {
   const wc = findWorkCenter(req.params.id);
   const alternativeId = requiredId(
     (req.body || {}).alternative_work_center_id,
@@ -216,7 +220,7 @@ router.post('/:id/alternatives', route((req, res) => {
   res.status(201).json({ success: true, message: 'Alternative added', data: { id: result.lastInsertRowid } });
 }));
 
-router.delete('/:id/alternatives/:altId', route((req, res) => {
+router.delete('/:id/alternatives/:altId', authorize('manager', 'admin'), route((req, res) => {
   const workCenterId = toId(req.params.id);
   const altId = toId(req.params.altId);
   if (!workCenterId || !altId) throw notFound('Alternative link not found');

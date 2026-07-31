@@ -8,6 +8,7 @@ import Landing from './pages/Landing.jsx';
 import DashboardHome from './pages/DashboardHome.jsx';
 import TechnicianDashboard from './pages/TechnicianDashboard.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
+import AdminUsers from './pages/AdminUsers.jsx';
 import ManagerOverview from './pages/ManagerOverview.jsx';
 import ManagerRequests from './pages/ManagerRequests.jsx';
 import ManagerWorkload from './pages/ManagerWorkload.jsx';
@@ -43,6 +44,7 @@ root.render(
           <Route index element={<RoleBasedHome />} />
           <Route path="home" element={<DashboardHome />} />
           <Route path="admin" element={<RoleRoute allowedRoles={['admin']}><AdminDashboard /></RoleRoute>} />
+          <Route path="admin/users" element={<RoleRoute allowedRoles={['admin']}><AdminUsers /></RoleRoute>} />
           <Route path="manager/overview" element={<RoleRoute allowedRoles={['manager']}><ManagerOverview /></RoleRoute>} />
           <Route path="manager/requests" element={<RoleRoute allowedRoles={['manager']}><ManagerRequests /></RoleRoute>} />
           <Route path="manager/requests/:requestId" element={<RoleRoute allowedRoles={['manager']}><ManagerRequests /></RoleRoute>} />

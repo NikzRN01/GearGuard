@@ -1,453 +1,129 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Button from '../components/ui/Button';
+import PageHeader from '../components/ui/PageHeader';
+import Panel from '../components/ui/Panel';
+import SelectMenu from '../components/ui/SelectMenu';
+import StatusBadge from '../components/ui/StatusBadge';
 import { api } from '../services/api';
 
-const isOpenStatus = (status) => {
-  const s = String(status || '').toLowerCase();
-  return s !== 'repaired' && s !== 'scrap' && s !== 'completed';
+const auditFilters = [
+  { value: 'all', label: 'All activity' },
+  { value: 'access', label: 'Access changes' },
+  { value: 'authentication', label: 'Authentication' },
+  { value: 'operations', label: 'Operational changes' }
+];
+
+const describeAction = (action) => {
+  const labels = {
+    'auth.login': 'Signed in',
+    'auth.logout': 'Signed out',
+    'auth.password.reset': 'Password reset completed',
+    'admin.user.role.update': 'User access changed',
+    'maintenance.create': 'Maintenance request created',
+    'maintenance.assign': 'Request assignment changed',
+    'maintenance.status': 'Request status changed',
+    'maintenance.note.create': 'Request note added'
+  };
+  return labels[action] || String(action || 'System activity').replaceAll('.', ' / ').replaceAll('_', ' ');
 };
 
-const normalizeStatus = (status) => {
-  const s = String(status || 'new').trim().toLowerCase();
-  if (s === 'in progress' || s === 'in_progress') return 'in_progress';
-  if (s === 'on hold' || s === 'on_hold') return 'on_hold';
-  return s.replaceAll(' ', '_');
+const eventCategory = (action) => {
+  if (String(action).startsWith('admin.')) return 'access';
+  if (String(action).startsWith('auth.')) return 'authentication';
+  return 'operations';
 };
 
-const statusLabel = (statusKey) => statusKey.replaceAll('_', ' ');
+const categoryTone = { access: 'danger', authentication: 'active', operations: 'neutral' };
+const categoryLabel = { access: 'Access', authentication: 'Authentication', operations: 'Operations' };
 
-/** Calendar-day key for a Date, in the viewer's own timezone. */
-const localDateKey = (date) =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-
-/**
- * SQLite hands back "YYYY-MM-DD HH:MM:SS" in UTC with no offset marker, which
- * JS would otherwise parse as local time. Normalise to a real instant first,
- * then bucket by the viewer's local day so both sides of the comparison agree.
- */
-const requestDateKey = (value) => {
-  if (!value) return '';
-  const raw = String(value).trim();
-  const iso = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(raw)
-    ? `${raw.replace(' ', 'T')}Z`
-    : raw;
-  const parsed = new Date(iso);
-  return Number.isNaN(parsed.getTime()) ? '' : localDateKey(parsed);
+const parseAuditDate = (value) => value ? new Date(`${String(value).replace(' ', 'T')}Z`) : null;
+const relativeTime = (value) => {
+  const date = parseAuditDate(value);
+  if (!date || Number.isNaN(date.getTime())) return 'Unknown time';
+  const seconds = Math.round((date.getTime() - Date.now()) / 1000);
+  const ranges = [[60, 'second'], [60, 'minute'], [24, 'hour'], [7, 'day']];
+  let amount = seconds;
+  for (const [limit, unit] of ranges) {
+    if (Math.abs(amount) < limit) return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(amount, unit);
+    amount = Math.round(amount / limit);
+  }
+  return date.toLocaleDateString();
 };
 
-/**
- * Status colours for the donut. These encode state, not series identity, so
- * they stay fixed rather than following the categorical order.
- *
- * Validated against the dark chart surface (#0b1220): every step clears 3:1,
- * and the worst adjacent pair separates by dE 9.4 under deuteranopia. The green
- * is a teal rather than a leaf green specifically so "repaired" and "scrap" do
- * not collapse into each other for red-green colourblind readers.
- * Segment identity is never carried by colour alone - the legend labels and
- * percentages sit beside every swatch.
- */
-const STATUS_COLORS = {
-  new: '#5aa6ff',          // info - matches the product accent
-  in_progress: '#fbbf24',  // warning - work in flight
-  on_hold: '#8f9db3',      // neutral - deliberately desaturated for "paused"
-  repaired: '#2dd4bf',     // good
-  completed: '#2dd4bf',    // good
-  scrap: '#f87171'         // critical
-};
-
-const CHART_EMPTY_TRACK = '#1c2740';
-const CHART_FALLBACK = '#5aa6ff';
-
-const AdminDashboard = () => {
+export default function AdminDashboard() {
   const navigate = useNavigate();
+  const [overview, setOverview] = useState({ totalUsers: 0, roles: {}, activeSessions: 0, recentAuditEvents: 0, pendingPasswordResets: 0 });
+  const [events, setEvents] = useState([]);
+  const [auditFilter, setAuditFilter] = useState('all');
+  const [auditQuery, setAuditQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [requests, setRequests] = useState([]);
-  const [equipment, setEquipment] = useState([]);
-  const [teams, setTeams] = useState([]);
-  const [users, setUsers] = useState([]);
 
   const load = async () => {
-    setError('');
     setLoading(true);
+    setError('');
     try {
-      const [maintenanceRes, equipmentRes, teamsRes, usersRes] = await Promise.all([
-        api.get('/maintenance'),
-        api.get('/equipment'),
-        api.get('/teams'),
-        api.get('/teams/users/all')
-      ]);
-
-      setRequests(maintenanceRes?.data?.data || []);
-      setEquipment(equipmentRes?.data?.data || []);
-      setTeams(teamsRes?.data?.data || []);
-      setUsers(usersRes?.data?.data || []);
-    } catch (e) {
-      setError(e?.response?.data?.message || 'Failed to load admin dashboard data');
+      const [overviewResponse, auditResponse] = await Promise.all([api.get('/admin/overview'), api.get('/admin/audit')]);
+      setOverview(overviewResponse?.data?.data || {});
+      setEvents(auditResponse?.data?.data || []);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to load administration data');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
-  const stats = useMemo(() => {
-    const open = requests.filter((r) => isOpenStatus(r.status));
-    const openRequests = open.length;
-    // Scoped to open work: this figure is the sub-line of the "Open Requests"
-    // card, so counting repaired/scrapped rows here would overstate it.
-    const unassigned = open.filter((r) => !r.assigned_to_user_id && !r.assigned_to_name).length;
-    const activeEquipment = equipment.filter((e) => String(e.status || '').toLowerCase() === 'active').length;
-    const technicians = users.filter((u) => String(u.role || '').toLowerCase() === 'technician').length;
-
-    return {
-      totalUsers: users.length,
-      totalTeams: teams.length,
-      openRequests,
-      unassigned,
-      totalEquipment: equipment.length,
-      activeEquipment,
-      technicians
-    };
-  }, [equipment, requests, teams.length, users]);
-
-  const topOpenRequests = useMemo(() => {
-    return requests
-      .filter((r) => isOpenStatus(r.status))
-      .sort((a, b) => {
-        const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
-        return bDate - aDate;
-      })
-      .slice(0, 8);
-  }, [requests]);
-
-  const statusAnalytics = useMemo(() => {
-    const counts = requests.reduce((acc, req) => {
-      const key = normalizeStatus(req.status);
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-
-    const entries = Object.entries(counts)
-      .map(([status, count]) => ({ status, count }))
-      .sort((a, b) => b.count - a.count);
-
-    const max = entries.length ? Math.max(...entries.map((e) => e.count)) : 1;
-
-    return { entries, max };
-  }, [requests]);
-
-  const statusDonut = useMemo(() => {
-    const total = statusAnalytics.entries.reduce((sum, item) => sum + item.count, 0);
-    if (!total) {
-      return {
-        total: 0,
-        segments: [],
-        gradient: `conic-gradient(${CHART_EMPTY_TRACK} 0deg 360deg)`
-      };
-    }
-
-    let start = 0;
-    const segments = statusAnalytics.entries.map((item) => {
-      const pct = item.count / total;
-      const deg = pct * 360;
-      const from = start;
-      const to = start + deg;
-      start = to;
-      return {
-        ...item,
-        pct,
-        color: STATUS_COLORS[item.status] || CHART_FALLBACK,
-        from,
-        to
-      };
+  const visibleEvents = useMemo(() => {
+    const query = auditQuery.trim().toLowerCase();
+    return events.filter((event) => {
+      const category = eventCategory(event.action);
+      const matchesCategory = auditFilter === 'all' || auditFilter === category;
+      const matchesQuery = !query || [describeAction(event.action), event.actor_name, event.actor_email, event.resource_type, event.resource_id].some((field) => String(field || '').toLowerCase().includes(query));
+      return matchesCategory && matchesQuery;
     });
-
-    const gradient = `conic-gradient(${segments
-      .map((s) => `${s.color} ${s.from}deg ${s.to}deg`)
-      .join(', ')})`;
-
-    return { total, segments, gradient };
-  }, [statusAnalytics.entries]);
-
-  const teamAnalytics = useMemo(() => {
-    const counts = requests.reduce((acc, req) => {
-      const key = req.team_name || 'Unassigned Team';
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-
-    const entries = Object.entries(counts)
-      .map(([team, count]) => ({ team, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 6);
-
-    const max = entries.length ? Math.max(...entries.map((e) => e.count)) : 1;
-
-    return { entries, max };
-  }, [requests]);
-
-  const trendAnalytics = useMemo(() => {
-    const now = new Date();
-    const days = [];
-
-    for (let offset = 6; offset >= 0; offset -= 1) {
-      const d = new Date(now);
-      d.setHours(0, 0, 0, 0);
-      d.setDate(d.getDate() - offset);
-      days.push(d);
-    }
-
-    const countsMap = days.reduce((acc, d) => {
-      acc[localDateKey(d)] = 0;
-      return acc;
-    }, {});
-
-    for (const req of requests) {
-      const key = requestDateKey(req.created_at);
-      if (key && Object.prototype.hasOwnProperty.call(countsMap, key)) {
-        countsMap[key] += 1;
-      }
-    }
-
-    const series = days.map((d) => {
-      const key = localDateKey(d);
-      return {
-        key,
-        label: d.toLocaleDateString(undefined, { weekday: 'short' }),
-        count: countsMap[key] || 0
-      };
-    });
-
-    const max = Math.max(1, ...series.map((item) => item.count));
-    const width = 540;
-    const height = 180;
-    const left = 10;
-    const right = width - 10;
-    const top = 14;
-    const bottom = height - 26;
-    const spanX = right - left;
-    const spanY = bottom - top;
-
-    const points = series.map((item, index) => {
-      const x = left + (spanX * index) / Math.max(1, series.length - 1);
-      const y = bottom - (item.count / max) * spanY;
-      return { ...item, x, y };
-    });
-
-    const linePath = points
-      .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`)
-      .join(' ');
-
-    const areaPath = points.length
-      ? `${linePath} L ${points[points.length - 1].x.toFixed(2)} ${bottom.toFixed(2)} L ${points[0].x.toFixed(2)} ${bottom.toFixed(2)} Z`
-      : '';
-
-    return { series, points, linePath, areaPath, width, height, max };
-  }, [requests]);
+  }, [auditFilter, auditQuery, events]);
 
   return (
-    <div className="container">
-      <div className="page-header">
-        <div>
-          <h1>Admin Dashboard</h1>
-          <p className="muted">System-wide overview of requests, users, teams, and equipment.</p>
+    <div className="container manager-page admin-overview-page">
+      <PageHeader eyebrow="System administration" title="Control center" description="Review identity, access, active sessions, and security activity across GearGuard." actions={<Button variant="secondary" onClick={load} disabled={loading}>{loading ? 'Refreshing...' : 'Refresh security data'}</Button>} />
+      {error && <div className="alert alert-error" role="alert">{error}</div>}
+
+      <section className="admin-kpi-grid" aria-label="Administration totals">
+        <div className="admin-kpi-card admin-kpi-card--users"><p>User accounts</p><strong>{overview.totalUsers || 0}</strong><span>Across all system roles</span></div>
+        <div className="admin-kpi-card admin-kpi-card--equipment"><p>Active sessions</p><strong>{overview.activeSessions || 0}</strong><span>Authenticated sessions now</span></div>
+        <div className="admin-kpi-card admin-kpi-card--requests"><p>Security activity</p><strong>{overview.recentAuditEvents || 0}</strong><span>Audit events in 24 hours</span></div>
+        <div className="admin-kpi-card admin-kpi-card--teams"><p>Password resets</p><strong>{overview.pendingPasswordResets || 0}</strong><span>Valid unused reset tokens</span></div>
+      </section>
+
+      <section className="admin-governance-strip" aria-label="Role distribution">
+        <div><p className="gg-eyebrow">Access governance</p><h2>System roles</h2><span>Administrative access is separate from maintenance operations.</span></div>
+        <dl className="admin-role-counts"><div><dt>Administrators</dt><dd>{overview.roles?.admin || 0}</dd></div><div><dt>Managers</dt><dd>{overview.roles?.manager || 0}</dd></div><div><dt>Technicians</dt><dd>{overview.roles?.technician || 0}</dd></div></dl>
+        <Button variant="secondary" onClick={() => navigate('/app/admin/users')}>Open user access</Button>
+      </section>
+
+      <Panel eyebrow="Security audit" title="Recent administrative activity" className="admin-audit-panel" action={<StatusBadge tone="neutral">Latest 50 events</StatusBadge>}>
+        <div className="admin-audit-toolbar">
+          <label className="admin-audit-search"><span className="sr-only">Search audit activity</span><input value={auditQuery} onChange={(event) => setAuditQuery(event.target.value)} placeholder="Search actor, action, or resource" /></label>
+          <div className="admin-audit-filter"><SelectMenu portal value={auditFilter} options={auditFilters} onChange={setAuditFilter} ariaLabel="Filter audit activity" /></div>
+          <span className="admin-audit-count" aria-live="polite">Showing {visibleEvents.length} of {events.length}</span>
         </div>
-
-        <div className="page-actions">
-          <button type="button" className="btn-accent" onClick={() => navigate('/app/requests', { state: { openNew: true } })}>
-            New Request
-          </button>
-          <button type="button" className="btn-secondary" onClick={load} disabled={loading}>
-            {loading ? 'Refreshing...' : 'Refresh'}
-          </button>
+        <div className="table-wrap admin-table-wrap">
+          <table className="table admin-audit-table">
+            <thead><tr><th>Activity</th><th>Actor</th><th>Target</th><th>When</th></tr></thead>
+            <tbody>
+              {!loading && visibleEvents.length === 0 && <tr><td colSpan={4} className="table-empty">No activity matches these filters.</td></tr>}
+              {visibleEvents.map((event) => {
+                const category = eventCategory(event.action);
+                const date = parseAuditDate(event.created_at);
+                return <tr key={event.id}><td><div className="admin-audit-event"><span className={`admin-audit-event__mark admin-audit-event__mark--${category}`} aria-hidden="true" /><div><strong>{describeAction(event.action)}</strong><StatusBadge tone={categoryTone[category]}>{categoryLabel[category]}</StatusBadge></div></div></td><td><strong>{event.actor_name || 'System'}</strong><small className="admin-audit-email">{event.actor_email || 'Automated event'}</small></td><td><span className="admin-audit-resource">{event.resource_type || 'system'}{event.resource_id ? ` #${event.resource_id}` : ''}</span></td><td><time dateTime={date?.toISOString()} title={date?.toLocaleString()}>{relativeTime(event.created_at)}</time><small className="admin-audit-email">{date?.toLocaleDateString()}</small></td></tr>;
+              })}
+            </tbody>
+          </table>
         </div>
-      </div>
-
-      {error && (
-        <div className="alert alert-error" style={{ marginBottom: 12 }}>
-          {error}
-        </div>
-      )}
-
-      <div className="card-grid admin-kpi-grid" style={{ marginBottom: 14 }}>
-        <div className="card admin-kpi-card">
-          <p className="muted">Open Requests</p>
-          <h2>{stats.openRequests}</h2>
-          <div className="admin-kpi-sub">{stats.unassigned} unassigned</div>
-        </div>
-
-        <div className="card admin-kpi-card">
-          <p className="muted">Users</p>
-          <h2>{stats.totalUsers}</h2>
-          <div className="admin-kpi-sub">{stats.technicians} technicians</div>
-        </div>
-
-        <div className="card admin-kpi-card">
-          <p className="muted">Teams</p>
-          <h2>{stats.totalTeams}</h2>
-          <div className="admin-kpi-sub">Org-wide coverage</div>
-        </div>
-
-        <div className="card admin-kpi-card">
-          <p className="muted">Equipment</p>
-          <h2>{stats.totalEquipment}</h2>
-          <div className="admin-kpi-sub">{stats.activeEquipment} active</div>
-        </div>
-      </div>
-
-      <div className="admin-analytics-grid">
-        <section className="admin-chart-card">
-          <div className="admin-chart-head">
-            <h3>Requests by Status</h3>
-            <span className="muted">Live share</span>
-          </div>
-
-          {statusDonut.total === 0 ? (
-            <div className="admin-chart-empty">No data yet</div>
-          ) : (
-            <div className="admin-donut-wrap">
-              <div className="admin-donut-shell">
-                <div className="admin-donut" style={{ background: statusDonut.gradient }} />
-                <div className="admin-donut-center">
-                  <div className="admin-donut-total">{statusDonut.total}</div>
-                  <div className="admin-donut-sub">Total</div>
-                </div>
-              </div>
-
-              <div className="admin-legend">
-                {statusDonut.segments.map((segment) => (
-                  <div key={segment.status} className="admin-legend-item">
-                    <span className="admin-legend-dot" style={{ background: segment.color }} />
-                    <span className="admin-legend-name">{statusLabel(segment.status)}</span>
-                    <span className="admin-legend-pct">{Math.round(segment.pct * 100)}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
-
-        <section className="admin-chart-card admin-trend-card">
-          <div className="admin-chart-head">
-            <h3>7-Day Request Trend</h3>
-            <span className="muted">Daily intake</span>
-          </div>
-
-          {trendAnalytics.series.every((item) => item.count === 0) ? (
-            <div className="admin-chart-empty">No requests created in the last 7 days</div>
-          ) : (
-            <>
-              <svg
-                viewBox={`0 0 ${trendAnalytics.width} ${trendAnalytics.height}`}
-                className="admin-trend-svg"
-                preserveAspectRatio="none"
-                aria-label="7-day request trend"
-              >
-                <defs>
-                  <linearGradient id="adminTrendArea" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="rgba(90,166,255,0.45)" />
-                    <stop offset="100%" stopColor="rgba(90,166,255,0.02)" />
-                  </linearGradient>
-                  {/* One series, so one hue. The previous blue-to-green ramp
-                      read as two different measures on a single line. */}
-                  <linearGradient id="adminTrendLine" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#5aa6ff" />
-                    <stop offset="100%" stopColor="#9fd1ff" />
-                  </linearGradient>
-                </defs>
-
-                <path d={trendAnalytics.areaPath} fill="url(#adminTrendArea)" />
-                <path d={trendAnalytics.linePath} fill="none" stroke="url(#adminTrendLine)" strokeWidth="4" strokeLinecap="round" />
-
-                {trendAnalytics.points.map((point) => (
-                  <circle key={point.key} cx={point.x} cy={point.y} r="4.8" className="admin-trend-dot" />
-                ))}
-              </svg>
-
-              <div className="admin-trend-axis">
-                {trendAnalytics.series.map((item) => (
-                  <div key={item.key} className="admin-trend-day">
-                    <span>{item.label}</span>
-                    <strong>{item.count}</strong>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </section>
-
-        <section className="admin-chart-card">
-          <div className="admin-chart-head">
-            <h3>Requests by Team</h3>
-            <span className="muted">Load intensity</span>
-          </div>
-
-          {teamAnalytics.entries.length === 0 ? (
-            <div className="admin-chart-empty">No data yet</div>
-          ) : (
-            <div className="admin-bars">
-              {teamAnalytics.entries.map((item) => (
-                <div key={item.team} className="admin-bar-row">
-                  <div className="admin-bar-label admin-team-label">{item.team}</div>
-                  <div className="admin-bar-track">
-                    <div
-                      className="admin-bar-fill admin-team-fill"
-                      style={{ width: `${Math.max(8, (item.count / teamAnalytics.max) * 100)}%` }}
-                    />
-                  </div>
-                  <div className="admin-bar-value">{item.count}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
-
-      <div className="table-wrap">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Request</th>
-              <th>Team</th>
-              <th>Assignee</th>
-              <th>Status</th>
-              <th>Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {!loading && topOpenRequests.length === 0 && (
-              <tr>
-                <td colSpan={5} className="table-empty">
-                  No open requests.
-                </td>
-              </tr>
-            )}
-
-            {topOpenRequests.map((r) => (
-              <tr key={r.id}>
-                <td>
-                  <div style={{ fontWeight: 650 }}>{r.subject}</div>
-                  <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
-                    {(r.work_center_name || r.equipment_name) ?? '-'}
-                  </div>
-                </td>
-                <td>{r.team_name || '-'}</td>
-                <td>{r.assigned_to_name || '-'}</td>
-                <td>
-                  <span className="pill">{String(r.status || 'new').replaceAll('_', ' ')}</span>
-                </td>
-                <td>{r.created_at ? new Date(r.created_at).toLocaleDateString() : '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      </Panel>
     </div>
   );
-};
-
-export default AdminDashboard;
+}

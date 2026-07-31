@@ -16,8 +16,12 @@ const {
   optionalEnum,
   route
 } = require('../lib/validation');
+const { authorize, audit } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Admins are governance-only: they read reports, they do not run operations.
+router.use(authorize('user', 'technician', 'manager'));
 
 const TYPES = ['corrective', 'preventive'];
 const STATUSES = ['new', 'in_progress', 'repaired', 'scrap'];
@@ -34,7 +38,23 @@ const VALID_TRANSITIONS = {
   scrap: []
 };
 
-const findRequest = (rawId, columns = 'id, status, team_id, type, equipment_id, work_center_id, scheduled_date') => {
+/**
+ * Row-level visibility. Managers and admins see the whole queue; a technician
+ * sees only what is assigned to them, and a plain user only what they raised.
+ * Applied in SQL so a caller cannot widen it with query parameters.
+ */
+const scopeToCaller = (req, push) => {
+  if (req.user.role === 'technician') push(' AND mr.assigned_to_user_id = ?', req.user.id);
+  else if (req.user.role === 'user') push(' AND mr.created_by_user_id = ?', req.user.id);
+};
+
+/** Whether the caller may see or comment on a specific request. */
+const canAccess = (req, request) =>
+  ['manager', 'admin'].includes(req.user.role)
+  || (req.user.role === 'technician' && Number(request.assigned_to_user_id) === Number(req.user.id))
+  || (req.user.role === 'user' && Number(request.created_by_user_id) === Number(req.user.id));
+
+const findRequest = (rawId, columns = 'id, status, team_id, type, equipment_id, work_center_id, scheduled_date, assigned_to_user_id, created_by_user_id') => {
   const id = toId(rawId);
   if (!id) throw notFound('Maintenance request not found');
   const request = db.prepare(`SELECT ${columns} FROM maintenance_requests WHERE id = ?`).get(id);
@@ -108,6 +128,11 @@ router.get('/', route((req, res) => {
     params.push(String(work_center_id));
   }
 
+  scopeToCaller(req, (clause, value) => {
+    query += clause;
+    params.push(value);
+  });
+
   query += ' ORDER BY mr.created_at DESC, mr.id DESC';
 
   const requests = db.prepare(query).all(...params);
@@ -145,6 +170,11 @@ router.get('/calendar', route((req, res) => {
     params.push(String(end_date));
   }
 
+  scopeToCaller(req, (clause, value) => {
+    query += clause;
+    params.push(value);
+  });
+
   query += ' ORDER BY mr.scheduled_date ASC, mr.id ASC';
 
   const requests = db.prepare(query).all(...params);
@@ -180,6 +210,7 @@ router.get('/:id', route((req, res) => {
   `).get(id);
 
   if (!request) throw notFound('Maintenance request not found');
+  if (!canAccess(req, request)) throw forbidden('You do not have access to this request');
 
   // Get notes for this request
   const notes = db.prepare(`
@@ -203,15 +234,21 @@ router.post('/', route((req, res) => {
   const workCenterId = optionalId(body.work_center_id, 'Work center') || null;
 
   if (!body.type || !body.subject || (!equipmentId && !workCenterId)
-      || (equipmentId && workCenterId) || body.created_by_user_id === undefined) {
-    throw badRequest('Type, subject, creator, and exactly one of equipment or work center are required');
+      || (equipmentId && workCenterId)) {
+    throw badRequest('Type, subject, and exactly one of equipment or work center are required');
   }
 
   const type = requiredEnum(body.type, 'Type', TYPES);
   const subject = requiredString(body.subject, 'Subject', LIMITS.subject);
-  const createdBy = requiredId(body.created_by_user_id, 'Creator');
+  // Ownership comes from the session, never the body: a client must not be
+  // able to raise a request in someone else's name.
+  const createdBy = req.user.id;
   const scheduledDate = optionalDate(body.scheduled_date, 'Scheduled date') ?? null;
-  const requestedTeamId = optionalId(body.team_id, 'Maintenance team') || null;
+  // Only managers and admins may choose the team; for everyone else it is
+  // derived from the equipment.
+  const requestedTeamId = ['manager', 'admin'].includes(req.user.role)
+    ? optionalId(body.team_id, 'Maintenance team') || null
+    : null;
 
   // Validate scheduled_date for preventive maintenance
   if (type === 'preventive' && !scheduledDate) {
@@ -242,10 +279,6 @@ router.post('/', route((req, res) => {
   // reference that no join can resolve.
   if (requestedTeamId) assertTeamExists(requestedTeamId);
 
-  // Check if user exists
-  const user = db.prepare('SELECT id FROM users WHERE id = ?').get(createdBy);
-  if (!user) throw notFound('User not found');
-
   const result = db.prepare(`
     INSERT INTO maintenance_requests (
       type, subject, equipment_id, work_center_id, team_id, scheduled_date,
@@ -261,6 +294,8 @@ router.post('/', route((req, res) => {
     'new', // Default status
     createdBy
   );
+
+  audit(req.user.id, 'maintenance.create', 'maintenance_request', result.lastInsertRowid);
 
   res.status(201).json({
     success: true,
@@ -282,6 +317,16 @@ router.patch('/:id/assign', route((req, res) => {
   // Closed work is a historical record; reassigning it would rewrite history.
   if (CLOSED_STATUSES.includes(request.status)) {
     throw badRequest(`Cannot reassign a request that is already ${request.status}`);
+  }
+
+  if (!['manager', 'admin', 'technician'].includes(req.user.role)) {
+    throw forbidden('You do not have permission to assign requests');
+  }
+  // A technician may claim unassigned work for themselves, and nothing else.
+  if (req.user.role === 'technician'
+      && (Number(userId) !== Number(req.user.id)
+        || (request.assigned_to_user_id && Number(request.assigned_to_user_id) !== Number(req.user.id)))) {
+    throw forbidden('Technicians may only assign an unassigned request to themselves');
   }
 
   // Check if user exists and has appropriate role
@@ -309,6 +354,10 @@ router.patch('/:id/assign', route((req, res) => {
     WHERE id = ?
   `).run(userId, request.id);
 
+  audit(req.user.id, 'maintenance.assign', 'maintenance_request', request.id, {
+    assigned_to_user_id: Number(userId)
+  });
+
   res.json({
     success: true,
     message: 'Request assigned successfully'
@@ -330,6 +379,11 @@ router.patch('/:id/status', route((req, res) => {
 
   const request = findRequest(req.params.id);
 
+  if (!['manager', 'admin'].includes(req.user.role)
+      && !(req.user.role === 'technician' && Number(request.assigned_to_user_id) === Number(req.user.id))) {
+    throw forbidden('Only the assigned technician or a manager may update status');
+  }
+
   const allowed = VALID_TRANSITIONS[request.status] || [];
   if (!allowed.includes(status)) {
     throw badRequest(`Cannot change status from ${request.status} to ${status}`);
@@ -349,6 +403,11 @@ router.patch('/:id/status', route((req, res) => {
     throw badRequest('The request status changed while this update was in flight');
   }
 
+  audit(req.user.id, 'maintenance.status', 'maintenance_request', request.id, {
+    from: request.status,
+    to: status
+  });
+
   res.json({
     success: true,
     message: 'Request status updated successfully'
@@ -358,11 +417,17 @@ router.patch('/:id/status', route((req, res) => {
 // Add note to request (for scrap logging or general comments)
 router.post('/:id/notes', route((req, res) => {
   const message = requiredString((req.body || {}).message, 'Note message', LIMITS.note);
-  const request = findRequest(req.params.id, 'id');
+  const request = findRequest(req.params.id);
+
+  if (!canAccess(req, request)) throw forbidden('You do not have access to this request');
 
   const result = db
     .prepare('INSERT INTO notes (request_id, message) VALUES (?, ?)')
     .run(request.id, message);
+
+  audit(req.user.id, 'maintenance.note.create', 'maintenance_request', request.id, {
+    note_id: Number(result.lastInsertRowid)
+  });
 
   res.status(201).json({
     success: true,
@@ -374,7 +439,7 @@ router.post('/:id/notes', route((req, res) => {
 // Update maintenance request details.
 // Only supplied fields are written; the request keeps its current target unless
 // the caller explicitly names a different one.
-router.put('/:id', route((req, res) => {
+router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
   const body = req.body || {};
   const existing = findRequest(req.params.id);
 
@@ -443,7 +508,7 @@ router.put('/:id', route((req, res) => {
 }));
 
 // Delete maintenance request
-router.delete('/:id', route((req, res) => {
+router.delete('/:id', authorize('manager', 'admin'), route((req, res) => {
   const existing = findRequest(req.params.id, 'id');
 
   // Notes cascade via the foreign key, but be explicit so the behaviour holds

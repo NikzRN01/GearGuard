@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { getSessionUser } from './services/session';
+import { api } from './services/api';
 
 
 export default function App() {
@@ -16,9 +17,17 @@ export default function App() {
   const isTechnician = user?.role === 'technician';
   const isAdmin = user?.role === 'admin';
   const isManager = user?.role === 'manager';
+  const usesOperationsShell = isManager || isTechnician || isAdmin;
+  const workspaceLabel = isTechnician ? 'Technician' : isAdmin ? 'Admin' : 'Manager';
 
-  const handleLogout = React.useCallback(() => {
+  const handleLogout = React.useCallback(async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // Local session is cleared even if the server session already expired.
+    }
     sessionStorage.removeItem('user');
+    sessionStorage.removeItem('csrf_token');
     navigate('/login');
   }, [navigate]);
 
@@ -62,12 +71,12 @@ export default function App() {
   }, [isManagerMenuOpen]);
 
   return (
-    <div className={`app-layout ${isManager ? 'manager-shell' : ''}`}>
-      {isManager && (
+    <div className={`app-layout ${usesOperationsShell ? `manager-shell ${isTechnician ? 'technician-shell' : isAdmin ? 'admin-shell' : ''}` : ''}`}>
+      {usesOperationsShell && (
         <header className="manager-mobile-header">
           <div className="manager-mobile-header__brand">
             <span className="manager-sidebar__mark" aria-hidden="true">G</span>
-            <span><strong>GearGuard</strong><small>Manager workspace</small></span>
+            <span><strong>GearGuard</strong><small>{workspaceLabel} workspace</small></span>
           </div>
           <button
             ref={managerMenuButtonRef}
@@ -82,7 +91,7 @@ export default function App() {
           </button>
         </header>
       )}
-      {isManager && isManagerMenuOpen && (
+      {usesOperationsShell && isManagerMenuOpen && (
         <button
           className="manager-sidebar-backdrop"
           type="button"
@@ -93,7 +102,7 @@ export default function App() {
           }}
         />
       )}
-      {!isManager && (
+      {!usesOperationsShell && (
         <div className="auth-backdrop">
           <span className="orb orb-a" />
           <span className="orb orb-b" />
@@ -102,23 +111,25 @@ export default function App() {
       )}
       
       <aside
-        ref={isManager ? managerSidebarRef : null}
-        id={isManager ? 'manager-navigation' : undefined}
-        aria-label={isManager ? 'Manager navigation' : 'Primary navigation'}
-        className={`app-sidebar ${isManager ? `manager-sidebar ${isManagerMenuOpen ? 'is-open' : ''}` : ''}`}
+        ref={usesOperationsShell ? managerSidebarRef : null}
+        id={usesOperationsShell ? 'manager-navigation' : undefined}
+        aria-label={usesOperationsShell ? `${workspaceLabel} navigation` : 'Primary navigation'}
+        className={`app-sidebar ${usesOperationsShell ? `manager-sidebar ${isManagerMenuOpen ? 'is-open' : ''}` : ''}`}
       >
-        {isManager ? (
+        {usesOperationsShell ? (
           <div className="manager-sidebar__brand">
             <span className="manager-sidebar__mark" aria-hidden="true">G</span>
-            <span className="manager-sidebar__brand-copy"><strong>GearGuard</strong><span>Maintenance operations</span></span>
+            <span className="manager-sidebar__brand-copy"><strong>GearGuard</strong><span>{isAdmin ? 'System administration' : 'Maintenance operations'}</span></span>
           </div>
         ) : (
           <div className="brand" style={{ marginTop: 4 }}>GearGuard</div>
         )}
         {isTechnician ? (
           <>
+            <p className="manager-sidebar__group-label">Work</p>
             <NavLink to="/app/technician" end>My Tasks</NavLink>
-            <NavLink to="/app/requests">All Requests</NavLink>
+            <NavLink to="/app/requests">Assigned Requests</NavLink>
+            <p className="manager-sidebar__group-label">Reference</p>
             <NavLink to="/app/teams">Teams</NavLink>
           </>
         ) : isManager ? (
@@ -132,6 +143,13 @@ export default function App() {
             <NavLink to="/app/equipment/machine-tools">Equipment</NavLink>
             <NavLink to="/app/equipment/work-center">Work Centers</NavLink>
             <NavLink to="/app/teams">Teams</NavLink>
+          </>
+        ) : isAdmin ? (
+          <>
+            <p className="manager-sidebar__group-label">Overview</p>
+            <NavLink to="/app/admin" end>Control Center</NavLink>
+            <p className="manager-sidebar__group-label">Governance</p>
+            <NavLink to="/app/admin/users">User Access</NavLink>
           </>
         ) : (
           <>
@@ -162,9 +180,9 @@ export default function App() {
           </>
         )}
 
-        {isManager ? (
+        {usesOperationsShell ? (
           <div className="manager-sidebar__footer">
-            <div className="manager-sidebar__user"><strong>{user?.name || 'Manager'}</strong><span>{user?.email || 'Manager account'}</span></div>
+            <div className="manager-sidebar__user"><strong>{user?.name || workspaceLabel}</strong><span>{user?.email || `${workspaceLabel} account`}</span>{isAdmin && <em>System administrator</em>}</div>
             <button type="button" className="sidebar-logout" onClick={handleLogout}>Log out</button>
           </div>
         ) : (

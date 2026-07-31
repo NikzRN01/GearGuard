@@ -1,9 +1,10 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import RoleRoute from './RoleRoute.jsx';
 import { getDefaultAppPath, getSessionUser } from '../services/session';
+import { api } from '../services/api';
 
 const Protected = () => <div>protected content</div>;
 
@@ -21,31 +22,65 @@ const renderRoute = (allowedRoles, entry = '/app/secret') =>
     </MemoryRouter>
   );
 
-const signIn = (role) => sessionStorage.setItem('user', JSON.stringify({ id: 1, name: 'T', role }));
+/** The route now proves identity against the server rather than trusting storage. */
+const signedInAs = (role) =>
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: { user: { id: 1, name: 'T', role }, csrfToken: 'csrf-abc' }
+  });
+
+const signedOut = () => vi.spyOn(api, 'get').mockRejectedValue({ response: { status: 401 } });
 
 describe('RoleRoute', () => {
-  it('redirects an anonymous visitor to the login page', () => {
+  it('shows a checking state before the session is confirmed', () => {
+    signedInAs('admin');
     renderRoute(['admin']);
-    expect(screen.getByText('login page')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(/checking your session/i);
   });
 
-  it('renders the route for an allowed role', () => {
-    signIn('admin');
+  it('redirects to login when the server rejects the session', async () => {
+    signedOut();
     renderRoute(['admin']);
-    expect(screen.getByText('protected content')).toBeInTheDocument();
+    expect(await screen.findByText('login page')).toBeInTheDocument();
   });
 
-  it('sends a disallowed role back to its own landing page', () => {
-    signIn('technician');
+  it('renders the route for an allowed role', async () => {
+    signedInAs('admin');
     renderRoute(['admin']);
+    expect(await screen.findByText('protected content')).toBeInTheDocument();
+  });
+
+  it('sends a disallowed role back to its own landing page', async () => {
+    signedInAs('technician');
+    renderRoute(['admin']);
+    expect(await screen.findByText('technician home')).toBeInTheDocument();
     expect(screen.queryByText('protected content')).not.toBeInTheDocument();
-    expect(screen.getByText('technician home')).toBeInTheDocument();
   });
 
-  it('allows any signed-in role when no list is supplied', () => {
-    signIn('user');
+  it('allows any signed-in role when no list is supplied', async () => {
+    signedInAs('user');
     renderRoute(undefined);
-    expect(screen.getByText('protected content')).toBeInTheDocument();
+    expect(await screen.findByText('protected content')).toBeInTheDocument();
+  });
+
+  it('caches the confirmed identity and CSRF token for later requests', async () => {
+    signedInAs('manager');
+    renderRoute(['manager']);
+
+    await screen.findByText('protected content');
+    await waitFor(() => expect(sessionStorage.getItem('csrf_token')).toBe('csrf-abc'));
+    expect(JSON.parse(sessionStorage.getItem('user')).role).toBe('manager');
+  });
+
+  it('clears stale identity when the session is gone', async () => {
+    sessionStorage.setItem('user', JSON.stringify({ id: 9, role: 'admin' }));
+    sessionStorage.setItem('csrf_token', 'stale');
+    signedOut();
+
+    renderRoute(['admin']);
+
+    await screen.findByText('login page');
+    expect(sessionStorage.getItem('user')).toBeNull();
+    expect(sessionStorage.getItem('csrf_token')).toBeNull();
   });
 });
 

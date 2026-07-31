@@ -14,8 +14,26 @@ const {
   route,
   isUniqueViolation
 } = require('../lib/validation');
+const {
+  authenticate,
+  requireCsrf,
+  createSession,
+  setSessionCookie,
+  clearSessionCookie,
+  destroySession,
+  audit
+} = require('../middleware/auth');
+const rateLimit = require('../middleware/rateLimit');
 
 const router = express.Router();
+
+// Credential endpoints are the ones worth brute-forcing, so they are throttled.
+// The ceilings are env-tunable so a test run can exercise the limiter directly
+// instead of tripping over it while testing something else.
+const LOGIN_MAX = Number(process.env.AUTH_LOGIN_RATE_MAX) || 10;
+const RECOVERY_MAX = Number(process.env.AUTH_RECOVERY_RATE_MAX) || 5;
+const loginRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: LOGIN_MAX });
+const recoveryRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: RECOVERY_MAX });
 
 const BCRYPT_ROUNDS = 10;
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour, matching the email copy.
@@ -91,7 +109,8 @@ const getTransporter = () => {
   return transporter;
 };
 
-const appBaseUrl = () => (process.env.APP_BASE_URL || 'http://localhost:5173').replace(/\/+$/, '');
+const appBaseUrl = () =>
+  (process.env.CLIENT_URL || process.env.APP_BASE_URL || 'http://localhost:5173').replace(/\/+$/, '');
 
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
@@ -113,9 +132,10 @@ router.post('/signup', route(async (req, res) => {
   const cleanName = requiredString(name, 'Name', LIMITS.name);
   const cleanEmail = normalizeEmail(email);
 
-  // Validate role if provided
-  const validRoles = ['admin', 'manager', 'technician', 'user'];
-  const invalidRole = badRequest('Invalid role. Must be: admin, manager, technician, or user');
+  // Public signup can never mint a privileged account: manager and admin are
+  // granted from the admin console, not claimed at the door.
+  const validRoles = ['technician', 'user'];
+  const invalidRole = badRequest('Public signup is limited to user or technician accounts');
   if (role !== undefined && role !== null && role !== '' && typeof role !== 'string') {
     throw invalidRole;
   }
@@ -158,7 +178,7 @@ router.post('/signup', route(async (req, res) => {
 }));
 
 // Login Route
-router.post('/login', route(async (req, res) => {
+router.post('/login', loginRateLimit, route(async (req, res) => {
   const { email, password, role } = req.body || {};
 
   // Validate required fields
@@ -186,18 +206,43 @@ router.post('/login', route(async (req, res) => {
     throw forbidden(`This account is registered as a ${user.role}, not a ${role}`);
   }
 
+  // Issue the session as an HttpOnly cookie; the CSRF token is returned in the
+  // body so the client can echo it on unsafe requests.
+  const session = createSession(user.id);
+  setSessionCookie(res, session.token);
+  audit(user.id, 'auth.login', 'session', null, { role: user.role });
+
   // Successful login - return user data (excluding password)
   const { password: _, ...userWithoutPassword } = user;
 
   res.status(200).json({
     success: true,
     message: 'Login successful',
-    user: userWithoutPassword
+    user: userWithoutPassword,
+    csrfToken: session.csrfToken,
+    expiresAt: session.expiresAt
   });
 }));
 
+// Who am I - lets the client rehydrate identity from the cookie alone.
+router.get('/me', authenticate, route((req, res) => {
+  res.json({
+    success: true,
+    user: req.user,
+    csrfToken: req.authSession.csrfToken,
+    expiresAt: req.authSession.expiresAt
+  });
+}));
+
+router.post('/logout', authenticate, requireCsrf, route((req, res) => {
+  audit(req.user.id, 'auth.logout', 'session');
+  destroySession(req);
+  clearSessionCookie(res);
+  res.json({ success: true, message: 'Logged out successfully' });
+}));
+
 // Forget Password Route
-router.post('/forget-password', route(async (req, res) => {
+router.post('/forget-password', recoveryRateLimit, route(async (req, res) => {
   const { email } = req.body || {};
 
   if (!email) {
@@ -229,7 +274,8 @@ router.post('/forget-password', route(async (req, res) => {
   });
   issue();
 
-  const resetUrl = `${appBaseUrl()}/reset-password?email=${encodeURIComponent(user.email)}&token=${token}`;
+  // The token alone identifies the account, so the link carries nothing else.
+  const resetUrl = `${appBaseUrl()}/reset-password?token=${encodeURIComponent(token)}`;
 
   try {
     await getTransporter().sendMail({
@@ -267,14 +313,12 @@ router.post('/forget-password', route(async (req, res) => {
 }));
 
 // Reset Password Route
-router.post('/reset-password', route(async (req, res) => {
-  const { email, token, newPassword, confirmPassword } = req.body || {};
+router.post('/reset-password', recoveryRateLimit, route(async (req, res) => {
+  const { token, newPassword, confirmPassword } = req.body || {};
 
-  if (!email || !newPassword || !confirmPassword) {
-    throw badRequest('Email, new password, and confirm password are required');
+  if (!newPassword || !confirmPassword) {
+    throw badRequest('New password and confirm password are required');
   }
-
-  const cleanEmail = normalizeEmail(email);
 
   if (newPassword !== confirmPassword) {
     throw badRequest('Passwords do not match');
@@ -282,19 +326,19 @@ router.post('/reset-password', route(async (req, res) => {
 
   const cleanPassword = assertPasswordPolicy(newPassword, 'Password');
 
-  // Possession of the emailed token is the only proof of ownership.
+  // Possession of the emailed token is the only proof of ownership. It also
+  // identifies the account, so no email address is asked for or trusted here.
   const cleanToken = requiredString(token, 'Reset token', 200);
   const invalidToken = badRequest('This password reset link is invalid or has expired');
 
   const record = db.prepare(`
-    SELECT prt.id, prt.user_id, prt.expires_at, prt.used_at, u.email
+    SELECT prt.id, prt.user_id, prt.expires_at, prt.used_at
     FROM password_reset_tokens prt
     JOIN users u ON u.id = prt.user_id
     WHERE prt.token_hash = ?
   `).get(hashToken(cleanToken));
 
   if (!record || record.used_at) throw invalidToken;
-  if (record.email.toLowerCase() !== cleanEmail.toLowerCase()) throw invalidToken;
   if (Date.parse(record.expires_at) <= Date.now()) throw invalidToken;
 
   const hashedPassword = await bcrypt.hash(cleanPassword, BCRYPT_ROUNDS);
@@ -307,13 +351,17 @@ router.post('/reset-password', route(async (req, res) => {
     if (claimed.changes !== 1) return false;
 
     db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashedPassword, record.user_id);
-    // Any other outstanding token for this account is now void.
+    // Any other outstanding token for this account is now void, and so is every
+    // active session: a password change must log out anyone already signed in.
     db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ? AND id != ?')
       .run(record.user_id, record.id);
+    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(record.user_id);
     return true;
   });
 
   if (!apply()) throw invalidToken;
+
+  audit(record.user_id, 'auth.password_reset', 'user', record.user_id);
 
   res.status(200).json({
     success: true,

@@ -29,8 +29,8 @@ test('signup: rejects missing fields', async () => {
   assert.match(res.body.message, /required/i);
 });
 
-test('signup: rejects an invalid role', async () => {
-  const res = await h.post('/api/auth/signup', {
+test('signup: rejects an unknown role', async () => {
+  const res = await h.anon.post('/api/auth/signup', {
     name: 'X',
     email: `role-${h.uid()}@example.com`,
     password: h.STRONG_PASSWORD,
@@ -38,7 +38,24 @@ test('signup: rejects an invalid role', async () => {
     role: 'superadmin'
   });
   assert.equal(res.status, 400);
-  assert.match(res.body.message, /Invalid role/i);
+  assert.match(res.body.message, /user or technician/i);
+});
+
+test('SECURITY: public signup cannot mint a privileged account', async () => {
+  for (const role of ['manager', 'admin']) {
+    const email = `escalate-${h.uid()}@example.com`;
+    const res = await h.anon.post('/api/auth/signup', {
+      name: 'Escalation attempt',
+      email,
+      password: h.STRONG_PASSWORD,
+      reEnterPassword: h.STRONG_PASSWORD,
+      role
+    });
+    assert.equal(res.status, 400, `signup accepted role "${role}"`);
+
+    const exists = h.db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+    assert.equal(exists, undefined, `a ${role} account was created anyway`);
+  }
 });
 
 test('signup: rejects a malformed email', async () => {
@@ -219,21 +236,58 @@ test('reset-password: rejects a forged token', async () => {
   assert.notEqual(res.status, 200);
 });
 
-test('reset-password: a token issued for one account cannot reset another', async () => {
-  const victim = await h.createUser('manager');
-  const attacker = await h.createUser('user');
+// The token alone identifies the account, so there is no email to mismatch.
+// The invariant worth pinning is that a token only ever moves its own account.
+test('reset-password: a token only resets the account it was issued for', async () => {
+  const victim = await h.createUser('technician');
+  const holder = await h.createUser('user');
 
-  const forgot = await h.post('/api/auth/forget-password', { email: attacker.email });
+  const forgot = await h.anon.post('/api/auth/forget-password', { email: holder.email });
   const token = forgot.body.resetToken || forgot.body.data?.resetToken;
-  assert.ok(token);
+  assert.ok(token, 'test mail transport should expose the generated token');
 
-  const res = await h.post('/api/auth/reset-password', {
-    email: victim.email,
+  const newPassword = 'Crossed123!';
+  const res = await h.anon.post('/api/auth/reset-password', {
     token,
-    newPassword: 'Crossed123!',
-    confirmPassword: 'Crossed123!'
+    newPassword,
+    confirmPassword: newPassword
   });
-  assert.notEqual(res.status, 200);
+  assert.equal(res.status, 200, res.text);
+
+  // The token holder's password moved...
+  const holderLogin = await h.anon.post('/api/auth/login', { email: holder.email, password: newPassword });
+  assert.equal(holderLogin.status, 200);
+
+  // ...and nobody else's did.
+  const victimStillOriginal = await h.anon.post('/api/auth/login', {
+    email: victim.email,
+    password: victim.password
+  });
+  assert.equal(victimStillOriginal.status, 200, 'an unrelated account was affected');
+
+  const victimWithNew = await h.anon.post('/api/auth/login', { email: victim.email, password: newPassword });
+  assert.notEqual(victimWithNew.status, 200, 'the reset leaked onto another account');
+});
+
+test('reset-password: a password change invalidates existing sessions', async () => {
+  const account = await h.createUser('technician');
+  const agent = h.agentFor(await h.login(account.email, account.password));
+
+  const before = await agent.get('/api/auth/me');
+  assert.equal(before.status, 200);
+
+  const forgot = await h.anon.post('/api/auth/forget-password', { email: account.email });
+  const token = forgot.body.resetToken;
+  const newPassword = 'Rotated456!';
+  const reset = await h.anon.post('/api/auth/reset-password', {
+    token,
+    newPassword,
+    confirmPassword: newPassword
+  });
+  assert.equal(reset.status, 200, reset.text);
+
+  const after = await agent.get('/api/auth/me');
+  assert.equal(after.status, 401, 'the old session should not survive a password reset');
 });
 
 test('forget-password: does not disclose whether an account exists', async () => {

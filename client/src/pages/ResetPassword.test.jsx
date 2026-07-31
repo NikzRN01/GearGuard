@@ -13,39 +13,42 @@ const renderAt = (search) =>
     </MemoryRouter>
   );
 
-const VALID = '?email=user%40example.com&token=abc123';
+const VALID = '?token=abc123';
+
+const fillAndSubmit = async (password = 'Rotated123!') => {
+  await userEvent.type(screen.getByLabelText('New Password'), password);
+  await userEvent.type(screen.getByLabelText('Confirm New Password'), password);
+  await userEvent.click(screen.getByRole('button', { name: 'Reset Password' }));
+};
 
 describe('ResetPassword', () => {
-  it('sends the token from the reset link', async () => {
+  it('sends only the token from the reset link', async () => {
     const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { success: true } });
     renderAt(VALID);
 
-    await userEvent.type(screen.getByLabelText('New Password'), 'Rotated123!');
-    await userEvent.type(screen.getByLabelText('Confirm New Password'), 'Rotated123!');
-    await userEvent.click(screen.getByRole('button', { name: 'Reset Password' }));
+    await fillAndSubmit();
 
     await waitFor(() => expect(post).toHaveBeenCalled());
+    // The token identifies the account on its own; no email is collected or sent.
     expect(post).toHaveBeenCalledWith('/auth/reset-password', {
-      email: 'user@example.com',
       token: 'abc123',
       newPassword: 'Rotated123!',
       confirmPassword: 'Rotated123!'
     });
   });
 
+  it('never asks for an email address', () => {
+    renderAt(VALID);
+    expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument();
+  });
+
   it('refuses a link with no token', async () => {
     const post = vi.spyOn(api, 'post');
-    renderAt('?email=user%40example.com');
+    renderAt('');
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/invalid reset link/i);
     expect(screen.getByRole('button', { name: 'Reset Password' })).toBeDisabled();
     expect(post).not.toHaveBeenCalled();
-  });
-
-  it('refuses a link with no email', async () => {
-    renderAt('?token=abc123');
-    expect(await screen.findByRole('alert')).toHaveTextContent(/invalid reset link/i);
-    expect(screen.getByRole('button', { name: 'Reset Password' })).toBeDisabled();
   });
 
   it('shows the API message when the token is rejected', async () => {
@@ -54,10 +57,17 @@ describe('ResetPassword', () => {
     });
     renderAt(VALID);
 
-    await userEvent.type(screen.getByLabelText('New Password'), 'Rotated123!');
-    await userEvent.type(screen.getByLabelText('Confirm New Password'), 'Rotated123!');
-    await userEvent.click(screen.getByRole('button', { name: 'Reset Password' }));
+    await fillAndSubmit();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/invalid or has expired/i);
+  });
+
+  it('reports a network outage distinctly', async () => {
+    vi.spyOn(api, 'post').mockRejectedValue({ code: 'ERR_NETWORK' });
+    renderAt(VALID);
+
+    await fillAndSubmit();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/unable to connect/i);
   });
 });

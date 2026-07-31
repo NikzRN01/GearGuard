@@ -11,8 +11,12 @@ const {
   route,
   isUniqueViolation
 } = require('../lib/validation');
+const { authorize } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Admins are governance-only: they read reports, they do not run operations.
+router.use(authorize('user', 'technician', 'manager'));
 
 const findTeam = (rawId) => {
   const id = toId(rawId);
@@ -23,7 +27,7 @@ const findTeam = (rawId) => {
 };
 
 // Get all users (for team member assignment)
-router.get('/users/all', route((req, res) => {
+router.get('/users/all', authorize('manager'), route((req, res) => {
   const users = db.prepare(`
     SELECT
       id,
@@ -80,7 +84,7 @@ router.get('/:id', route((req, res) => {
 }));
 
 // Create new team
-router.post('/', route((req, res) => {
+router.post('/', authorize('manager', 'admin'), route((req, res) => {
   const name = requiredString((req.body || {}).name, 'Team name', LIMITS.name);
 
   // Check for duplicate team name
@@ -106,7 +110,7 @@ router.post('/', route((req, res) => {
 }));
 
 // Update team
-router.put('/:id', route((req, res) => {
+router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
   const team = findTeam(req.params.id);
   const name = requiredString((req.body || {}).name, 'Team name', LIMITS.name);
 
@@ -130,7 +134,7 @@ router.put('/:id', route((req, res) => {
 }));
 
 // Delete team
-router.delete('/:id', route((req, res) => {
+router.delete('/:id', authorize('manager', 'admin'), route((req, res) => {
   const team = findTeam(req.params.id);
 
   // Check if team is assigned to any equipment
@@ -159,7 +163,7 @@ router.delete('/:id', route((req, res) => {
 }));
 
 // Add member to team
-router.post('/:id/members', route((req, res) => {
+router.post('/:id/members', authorize('manager', 'admin'), route((req, res) => {
   const team = findTeam(req.params.id);
   const userId = requiredId((req.body || {}).user_id, 'User ID');
 
@@ -189,7 +193,7 @@ router.post('/:id/members', route((req, res) => {
 }));
 
 // Remove member from team
-router.delete('/:id/members/:userId', route((req, res) => {
+router.delete('/:id/members/:userId', authorize('manager', 'admin'), route((req, res) => {
   const teamId = toId(req.params.id);
   const userId = toId(req.params.userId);
   if (!teamId || !userId) throw notFound('Member not found in this team');
@@ -210,7 +214,7 @@ router.delete('/:id/members/:userId', route((req, res) => {
 }));
 
 // Get available users (eligible users who are not already in this team)
-router.get('/:id/available-users', route((req, res) => {
+router.get('/:id/available-users', authorize('manager', 'admin'), route((req, res) => {
   const team = findTeam(req.params.id);
 
   const users = db.prepare(`

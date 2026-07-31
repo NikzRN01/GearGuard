@@ -101,24 +101,37 @@ test('POST /api/maintenance requires a scheduled date for preventive work', asyn
   assert.match(res.body.message, /scheduled date/i);
 });
 
-test('POST /api/maintenance rejects unknown equipment, work centre and creator', async () => {
-  const user = await h.createUser('manager');
-  const equipment = await h.createEquipment();
-
+test('POST /api/maintenance rejects unknown equipment and work centre', async () => {
   const badEquipment = await h.post('/api/maintenance', {
-    type: 'corrective', subject: 'X', equipment_id: 999999, created_by_user_id: user.id
+    type: 'corrective', subject: 'X', equipment_id: 999999
   });
   assert.equal(badEquipment.status, 404);
 
   const badWorkCenter = await h.post('/api/maintenance', {
-    type: 'corrective', subject: 'X', work_center_id: 999999, created_by_user_id: user.id
+    type: 'corrective', subject: 'X', work_center_id: 999999
   });
   assert.equal(badWorkCenter.status, 404);
+});
 
-  const badUser = await h.post('/api/maintenance', {
-    type: 'corrective', subject: 'X', equipment_id: equipment.id, created_by_user_id: 999999
+test('SECURITY: the creator is taken from the session, not the request body', async () => {
+  const victim = await h.createUser('technician');
+  const equipment = await h.createEquipment();
+  const author = await h.as('user');
+
+  const res = await author.post('/api/maintenance', {
+    type: 'corrective',
+    subject: 'Spoofed creator',
+    equipment_id: equipment.id,
+    // A client must not be able to raise a request in somebody else's name.
+    created_by_user_id: victim.id
   });
-  assert.equal(badUser.status, 404);
+  assert.equal(res.status, 201, res.text);
+
+  const stored = h.db
+    .prepare('SELECT created_by_user_id FROM maintenance_requests WHERE id = ?')
+    .get(res.body.data.id);
+  assert.equal(stored.created_by_user_id, author.user.id);
+  assert.notEqual(stored.created_by_user_id, victim.id);
 });
 
 test('POST /api/maintenance rejects an unknown team_id instead of storing a dangling reference', async () => {

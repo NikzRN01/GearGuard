@@ -9,22 +9,33 @@ const ME = { id: 7, name: 'Marc Demo', role: 'technician' };
 
 const signIn = (user = ME) => sessionStorage.setItem('user', JSON.stringify(user));
 
-const renderPage = () =>
-  render(<MemoryRouter><TechnicianDashboard /></MemoryRouter>);
+const renderPage = () => render(<MemoryRouter><TechnicianDashboard /></MemoryRouter>);
+
+const yesterday = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+};
 
 const rows = [
-  { id: 1, subject: 'Mine: new', status: 'new', type: 'corrective', assigned_to_user_id: 7, assigned_to_name: 'Marc Demo' },
-  { id: 2, subject: 'Mine: working', status: 'in_progress', type: 'corrective', assigned_to_user_id: 7, assigned_to_name: 'Marc Demo' },
-  { id: 3, subject: 'Mine: done', status: 'repaired', type: 'preventive', assigned_to_user_id: 7, assigned_to_name: 'Marc Demo' },
-  { id: 4, subject: 'Someone else', status: 'in_progress', type: 'corrective', assigned_to_user_id: 99, assigned_to_name: 'Anas Makari' },
-  { id: 5, subject: 'Unassigned', status: 'new', type: 'corrective', assigned_to_user_id: null, assigned_to_name: null }
+  { id: 1, subject: 'Mine: new', status: 'new', type: 'corrective', assigned_to_user_id: 7 },
+  { id: 2, subject: 'Mine: working', status: 'in_progress', type: 'corrective', assigned_to_user_id: 7 },
+  { id: 3, subject: 'Mine: done', status: 'repaired', type: 'preventive', assigned_to_user_id: 7 },
+  { id: 4, subject: 'Mine: overdue', status: 'new', type: 'corrective', assigned_to_user_id: 7, scheduled_date: yesterday() },
+  { id: 5, subject: 'Someone else', status: 'in_progress', type: 'corrective', assigned_to_user_id: 99 },
+  { id: 6, subject: 'Unassigned', status: 'new', type: 'corrective', assigned_to_user_id: null }
 ];
 
-const stat = (label) =>
-  screen.getByText(label).parentElement.querySelector('.tech-stat-value').textContent;
+/** Reads a KPI from the stat grid; the same words also appear as status badges. */
+const stat = (label) => {
+  const grid = document.querySelector('.tech-stats-grid');
+  const card = [...grid.querySelectorAll('.tech-stat-card')]
+    .find((node) => node.querySelector('.tech-stat-label')?.textContent === label);
+  return card.querySelector('.tech-stat-value').textContent;
+};
 
 describe('TechnicianDashboard', () => {
-  it('shows only the signed-in technician\'s own tasks', async () => {
+  it("shows only the signed-in technician's own tasks", async () => {
     signIn();
     vi.spyOn(api, 'get').mockResolvedValue({ data: { data: rows } });
 
@@ -32,7 +43,6 @@ describe('TechnicianDashboard', () => {
 
     await waitFor(() => expect(screen.getByText('Mine: new')).toBeInTheDocument());
     expect(screen.getByText('Mine: working')).toBeInTheDocument();
-    expect(screen.getByText('Mine: done')).toBeInTheDocument();
 
     expect(screen.queryByText('Someone else')).not.toBeInTheDocument();
     expect(screen.queryByText('Unassigned')).not.toBeInTheDocument();
@@ -44,29 +54,36 @@ describe('TechnicianDashboard', () => {
 
     renderPage();
 
-    await waitFor(() => expect(stat('Total Tasks')).toBe('3'));
-    expect(stat('In Progress')).toBe('1');
-    expect(stat('Completed')).toBe('1');
-    expect(stat('New Tasks')).toBe('1');
+    // Open work excludes the repaired row: 3 of the 4 own tasks are still open.
+    await waitFor(() => expect(stat('Open tasks')).toBe('3'));
+    expect(stat('In progress')).toBe('1');
+    expect(stat('New tasks')).toBe('2');
+    expect(stat('Overdue')).toBe('1');
   });
 
-  it('asks the API for its own assignments only', async () => {
+  it('does not count closed work as overdue', async () => {
     signIn();
-    const get = vi.spyOn(api, 'get').mockResolvedValue({ data: { data: [] } });
+    vi.spyOn(api, 'get').mockResolvedValue({
+      data: {
+        data: [
+          { id: 1, subject: 'Closed but past due', status: 'repaired', assigned_to_user_id: 7, scheduled_date: yesterday() }
+        ]
+      }
+    });
 
     renderPage();
 
-    await waitFor(() => expect(get).toHaveBeenCalled());
-    expect(get).toHaveBeenCalledWith('/maintenance', { params: { assigned_to: ME.id } });
+    await waitFor(() => expect(stat('Overdue')).toBe('0'));
+    expect(stat('Open tasks')).toBe('0');
   });
 
   it('renders an empty state instead of failing when nothing is assigned', async () => {
     signIn();
-    vi.spyOn(api, 'get').mockResolvedValue({ data: { data: [rows[3], rows[4]] } });
+    vi.spyOn(api, 'get').mockResolvedValue({ data: { data: [rows[4], rows[5]] } });
 
     renderPage();
 
-    await waitFor(() => expect(screen.getByText('No tasks assigned yet')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('No assigned tasks')).toBeInTheDocument());
   });
 
   it('surfaces a load failure', async () => {
@@ -83,7 +100,7 @@ describe('TechnicianDashboard', () => {
 
     renderPage();
 
-    await waitFor(() => expect(screen.getByText('No tasks assigned yet')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('No assigned tasks')).toBeInTheDocument());
     expect(get).not.toHaveBeenCalled();
   });
 });
