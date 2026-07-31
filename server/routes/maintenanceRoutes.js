@@ -475,7 +475,13 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
     if (!equipment) throw notFound('Equipment not found');
     updates.equipment_id = equipmentId;
     updates.work_center_id = null;
-    if (equipment.maintenance_team_id) updates.team_id = equipment.maintenance_team_id;
+    // The equipment's team is a default for a *newly pointed* request only.
+    // Re-sending the same equipment (which the edit form does on every save)
+    // must not silently discard a team a manager chose by hand.
+    const changingEquipment = Number(existing.equipment_id) !== Number(equipmentId);
+    if (equipment.maintenance_team_id && (changingEquipment || !existing.team_id)) {
+      updates.team_id = equipment.maintenance_team_id;
+    }
   } else if (workCenterId) {
     const wc = db.prepare('SELECT id FROM work_centers WHERE id = ?').get(workCenterId);
     if (!wc) throw notFound('Work center not found');
@@ -501,6 +507,10 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
   db.prepare(`UPDATE maintenance_requests SET ${assignments.join(', ')} WHERE id = ?`)
     .run(...Object.values(updates), existing.id);
 
+  audit(req.user.id, 'maintenance.update', 'maintenance_request', existing.id, {
+    fields: Object.keys(updates)
+  });
+
   res.json({
     success: true,
     message: 'Maintenance request updated successfully'
@@ -509,7 +519,7 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
 
 // Delete maintenance request
 router.delete('/:id', authorize('manager', 'admin'), route((req, res) => {
-  const existing = findRequest(req.params.id, 'id');
+  const existing = findRequest(req.params.id, 'id, subject, status');
 
   // Notes cascade via the foreign key, but be explicit so the behaviour holds
   // even on a database opened without foreign key enforcement.
@@ -518,6 +528,13 @@ router.delete('/:id', authorize('manager', 'admin'), route((req, res) => {
     db.prepare('DELETE FROM maintenance_requests WHERE id = ?').run(existing.id);
   });
   remove();
+
+  // Recorded after the fact: once the row is gone the audit entry is the only
+  // remaining trace of what was removed.
+  audit(req.user.id, 'maintenance.delete', 'maintenance_request', existing.id, {
+    subject: existing.subject,
+    status: existing.status
+  });
 
   res.json({
     success: true,

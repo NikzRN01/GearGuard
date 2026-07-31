@@ -38,6 +38,18 @@ const isPlainValue = (value) =>
   value === null || ['string', 'number', 'boolean'].includes(typeof value);
 
 /**
+ * Characters that are never meaningful content but are routinely used to make
+ * stored text lie about itself: NUL (truncates the value for anything that
+ * reads it as a C string) and the Unicode bidirectional overrides, which can
+ * reverse how a name renders without changing what is compared. Tab, newline
+ * and carriage return are deliberately kept - notes are multi-line.
+ */
+// eslint-disable-next-line no-control-regex
+const UNSAFE_TEXT = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
+
+const stripUnsafe = (value) => value.replace(UNSAFE_TEXT, '');
+
+/**
  * A required, non-blank string. Objects and arrays are rejected outright rather
  * than being stringified into the database.
  */
@@ -48,7 +60,7 @@ function requiredString(value, field, max = LIMITS.shortText) {
   if (typeof value !== 'string') {
     throw badRequest(`${field} must be text`);
   }
-  const trimmed = value.trim();
+  const trimmed = stripUnsafe(value).trim();
   if (!trimmed) throw badRequest(`${field} cannot be blank`);
   if (trimmed.length > max) {
     throw badRequest(`${field} must be ${max} characters or fewer`);
@@ -66,7 +78,7 @@ function optionalString(value, field, max = LIMITS.shortText) {
   if (typeof value !== 'string') {
     throw badRequest(`${field} must be text`);
   }
-  const trimmed = value.trim();
+  const trimmed = stripUnsafe(value).trim();
   if (!trimmed) return null;
   if (trimmed.length > max) {
     throw badRequest(`${field} must be ${max} characters or fewer`);

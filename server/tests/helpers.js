@@ -34,6 +34,7 @@ process.env.CLIENT_URL = 'http://localhost:5173';
 // The limiter itself is covered by tests/rateLimit.test.js.
 process.env.AUTH_LOGIN_RATE_MAX = '100000';
 process.env.AUTH_RECOVERY_RATE_MAX = '100000';
+process.env.AUTH_SIGNUP_RATE_MAX = '100000';
 
 const app = require('../server');
 const db = require('../database');

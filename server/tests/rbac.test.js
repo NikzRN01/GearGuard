@@ -1,6 +1,35 @@
+/**
+ * Role-based access control, exercised against the seeded demo accounts.
+ *
+ * The environment below MUST be set before `../server` is required: that import
+ * pulls in dotenv and database.js, and without an explicit SQLITE_DB_PATH this
+ * suite opened the developer's own server/portal.db and wrote sessions, audit
+ * entries and signup accounts into it on every run. A fresh file gets the same
+ * demo seed (seedDemoData in database.js), so the accounts below still exist.
+ */
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
+
+process.env.SQLITE_DB_PATH = path.join(
+  fs.mkdtempSync(path.join(os.tmpdir(), 'gearguard-rbac-')),
+  'portal.db'
+);
+process.env.NODE_ENV = 'test';
+// Blank the credentials from .env as well, so no run can reach a real mailbox.
+process.env.SMTP_USER = '';
+process.env.SMTP_PASS = '';
+process.env.MAIL_TRANSPORT = 'json';
+process.env.AUTH_LOGIN_RATE_MAX = '100000';
+process.env.AUTH_SIGNUP_RATE_MAX = '100000';
+process.env.AUTH_RECOVERY_RATE_MAX = '100000';
+
 const app = require('../server');
+
+/** The password seedDemoData gives every demo account. */
+const DEMO_PASSWORD = 'Password123!';
 
 let server;
 let baseUrl;
@@ -18,7 +47,7 @@ async function login(email, role) {
   const response = await fetch(`${baseUrl}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password: 'Password123!', role })
+    body: JSON.stringify({ email, password: DEMO_PASSWORD, role })
   });
   const body = await response.json();
   assert.equal(response.status, 200, JSON.stringify(body));

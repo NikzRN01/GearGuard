@@ -32,8 +32,16 @@ const router = express.Router();
 // instead of tripping over it while testing something else.
 const LOGIN_MAX = Number(process.env.AUTH_LOGIN_RATE_MAX) || 10;
 const RECOVERY_MAX = Number(process.env.AUTH_RECOVERY_RATE_MAX) || 5;
+// Signup is throttled too: every attempt costs a bcrypt hash and, left open,
+// lets one caller fill the user table at will.
+const SIGNUP_MAX = Number(process.env.AUTH_SIGNUP_RATE_MAX) || 10;
 const loginRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: LOGIN_MAX });
 const recoveryRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: RECOVERY_MAX });
+const signupRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: SIGNUP_MAX,
+  message: 'Too many accounts created from this address. Please try again later.'
+});
 
 const BCRYPT_ROUNDS = 10;
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour, matching the email copy.
@@ -76,13 +84,22 @@ const assertPasswordPolicy = (password, field) => {
   return value;
 };
 
-// Case is preserved so accounts created before this validation existed keep
-// working; comparisons that need to be case-insensitive lower-case explicitly.
+// The address is stored exactly as the account holder typed it, because that is
+// what they will see in the UI and in mail. Every *comparison*, though, is done
+// on the lower-cased form: addresses are not case-sensitive in practice, and
+// treating them as such would let "Alex@x.com" and "alex@x.com" become two
+// separate accounts that both look like the same login.
 const normalizeEmail = (value, field = 'Email') => {
   const email = requiredString(value, field, LIMITS.email);
   if (!emailRegex.test(email)) throw badRequest('Invalid email format');
   return email;
 };
+
+/** The comparison key for an address. Matches the UNIQUE INDEX on LOWER(email). */
+const emailKey = (value) => String(value).trim().toLowerCase();
+
+const findUserByEmail = (email, columns = '*') =>
+  db.prepare(`SELECT ${columns} FROM users WHERE LOWER(email) = ?`).get(emailKey(email));
 
 /**
  * Built lazily so a missing SMTP configuration cannot break module loading, and
@@ -121,7 +138,7 @@ const escapeHtml = (value) =>
   }[char]));
 
 // Sign Up Route
-router.post('/signup', route(async (req, res) => {
+router.post('/signup', signupRateLimit, route(async (req, res) => {
   const { name, email, password, reEnterPassword, role } = req.body || {};
 
   // Validate required fields
@@ -150,8 +167,8 @@ router.post('/signup', route(async (req, res) => {
   // Validate password strength
   const cleanPassword = assertPasswordPolicy(password, 'Password');
 
-  // Check if user already exists
-  const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(cleanEmail);
+  // Check if user already exists, ignoring case.
+  const existingUser = findUserByEmail(cleanEmail, 'id');
   if (existingUser) {
     throw conflict('Account already exists with this email');
   }
@@ -189,7 +206,7 @@ router.post('/login', loginRateLimit, route(async (req, res) => {
     throw badRequest('Email and password must be text');
   }
 
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim());
+  const user = findUserByEmail(email);
 
   // Compare against a throwaway hash when the account does not exist, so both
   // the response time and the status code stay identical for unknown emails
@@ -250,7 +267,7 @@ router.post('/forget-password', recoveryRateLimit, route(async (req, res) => {
   }
   const cleanEmail = normalizeEmail(email);
 
-  const user = db.prepare('SELECT id, name, email FROM users WHERE email = ?').get(cleanEmail);
+  const user = findUserByEmail(cleanEmail, 'id, name, email');
 
   // Always answer identically, whether or not the account exists.
   const genericResponse = {

@@ -33,6 +33,25 @@ const createUsersTable = () => {
   db.prepare(query).run();
 };
 
+// Email addresses are not case-sensitive in practice. The column's own UNIQUE
+// constraint compares byte-for-byte, so without this index "Alex@x.com" and
+// "alex@x.com" would become two accounts that look identical at the login form.
+// Routes compare on LOWER(email), which this index also serves.
+const ensureCaseInsensitiveEmailIndex = () => {
+  const duplicates = db
+    .prepare('SELECT LOWER(email) AS key, COUNT(*) AS count FROM users GROUP BY LOWER(email) HAVING count > 1')
+    .all();
+  if (duplicates.length > 0) {
+    // Refuse silently rather than crash the boot: an operator has to decide
+    // which of the colliding accounts survives.
+    console.warn(
+      `Cannot enforce case-insensitive email uniqueness: ${duplicates.length} address(es) already differ only by case.`
+    );
+    return;
+  }
+  db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_nocase ON users(LOWER(email))').run();
+};
+
 const createSessionsTable = () => {
   db.prepare(`
     CREATE TABLE IF NOT EXISTS sessions (
@@ -186,6 +205,9 @@ const migrateMaintenanceRequestsTable = () => {
   const existingCols = new Set(columns.map((c) => c.name));
   const selectWorkCenter = existingCols.has('work_center_id') ? 'work_center_id' : 'NULL as work_center_id';
 
+  // Foreign keys must be off while the table is swapped, and must be restored
+  // even if the rebuild fails - otherwise the whole process would keep running
+  // with constraint enforcement silently disabled.
   db.prepare('PRAGMA foreign_keys = OFF').run();
   const tx = db.transaction(() => {
     db.prepare(`
@@ -225,8 +247,11 @@ const migrateMaintenanceRequestsTable = () => {
     db.prepare('DROP TABLE maintenance_requests').run();
     db.prepare('ALTER TABLE maintenance_requests_new RENAME TO maintenance_requests').run();
   });
-  tx();
-  db.prepare('PRAGMA foreign_keys = ON').run();
+  try {
+    tx();
+  } finally {
+    db.prepare('PRAGMA foreign_keys = ON').run();
+  }
 };
 
 // Create notes table
@@ -348,6 +373,7 @@ const seedDemoData = () => {
 // Initialize all tables
 const initializeDatabase = () => {
   createUsersTable();
+  ensureCaseInsensitiveEmailIndex();
   createSessionsTable();
   createAuditLogTable();
   createPasswordResetTokensTable();

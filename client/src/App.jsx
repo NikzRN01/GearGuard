@@ -122,7 +122,10 @@ export default function App() {
             <span className="manager-sidebar__mark" aria-hidden="true">G</span>
             <span className="manager-sidebar__brand-copy"><strong>GearGuard</strong><span>{isAdmin ? 'System administration' : isUser ? 'Maintenance requests' : 'Maintenance operations'}</span></span>
           </div>
-        ) : isUser ? (
+        ) : (
+          <div className="brand" style={{ marginTop: 4 }}>GearGuard</div>
+        )}
+        {isUser ? (
           <>
             <p className="manager-sidebar__group-label">My workspace</p>
             <NavLink to="/app/home" end>Home</NavLink>
@@ -130,10 +133,7 @@ export default function App() {
             <p className="manager-sidebar__group-label">Reference</p>
             <NavLink to="/app/equipment/machine-tools">Equipment Directory</NavLink>
           </>
-        ) : (
-          <div className="brand" style={{ marginTop: 4 }}>GearGuard</div>
-        )}
-        {isTechnician ? (
+        ) : isTechnician ? (
           <>
             <p className="manager-sidebar__group-label">Work</p>
             <NavLink to="/app/technician" end>My Tasks</NavLink>
@@ -162,7 +162,7 @@ export default function App() {
           </>
         ) : (
           <>
-            <NavLink to={isAdmin ? '/app/admin' : '/app/home'} end>{isAdmin ? 'Admin Dashboard' : 'Home'}</NavLink>
+            <NavLink to="/app/home" end>Home</NavLink>
             <NavLink to="/app/calendar">Maintenance Calendar</NavLink>
             <details className="sidebar-dropdown" open={isEquipmentPage}>
               <summary>

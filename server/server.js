@@ -13,6 +13,17 @@ const { HttpError } = require('./lib/validation');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Behind a proxy (Vercel, nginx, a load balancer) every request arrives from the
+// proxy's address, so req.ip is identical for everyone and the auth rate limiter
+// degrades into a global one - a single attacker would lock out every user.
+// TRUST_PROXY takes any value Express accepts ('1', 'loopback', a CIDR list).
+// It is off by default because trusting X-Forwarded-For when nothing strips it
+// lets a client forge its own address and bypass the limiter entirely.
+const trustProxy = process.env.TRUST_PROXY ?? (process.env.VERCEL ? '1' : '');
+if (trustProxy) {
+  app.set('trust proxy', /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
+}
+
 // Browsers may only call this API from an allow-listed origin. Sessions travel
 // as cookies, so this must stay an exact list - a wildcard cannot be combined
 // with credentials. Set CORS_ALLOWED_ORIGINS in every deployed environment;

@@ -31,10 +31,15 @@ const signedInAs = (role) =>
 const signedOut = () => vi.spyOn(api, 'get').mockRejectedValue({ response: { status: 401 } });
 
 describe('RoleRoute', () => {
-  it('shows a checking state before the session is confirmed', () => {
+  it('shows a checking state before the session is confirmed', async () => {
     signedInAs('admin');
     renderRoute(['admin']);
     expect(screen.getByRole('status')).toHaveTextContent(/checking your session/i);
+
+    // Let the in-flight /auth/me settle inside the test. Without this the state
+    // update lands after the test has finished, which React reports as an
+    // unwrapped act() and which leaves a pending promise for the next test.
+    expect(await screen.findByText('protected content')).toBeInTheDocument();
   });
 
   it('redirects to login when the server rejects the session', async () => {

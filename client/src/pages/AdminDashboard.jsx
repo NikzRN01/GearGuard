@@ -6,6 +6,7 @@ import Panel from '../components/ui/Panel';
 import SelectMenu from '../components/ui/SelectMenu';
 import StatusBadge from '../components/ui/StatusBadge';
 import { api } from '../services/api';
+import { parseTimestamp } from '../services/datetime';
 
 const auditFilters = [
   { value: 'all', label: 'All activity' },
@@ -14,13 +15,17 @@ const auditFilters = [
   { value: 'operations', label: 'Operational changes' }
 ];
 
+// Keys must match the action strings the API writes in middleware/auth.js
+// callers; an unlisted action still renders, just without a friendly label.
 const describeAction = (action) => {
   const labels = {
     'auth.login': 'Signed in',
     'auth.logout': 'Signed out',
-    'auth.password.reset': 'Password reset completed',
+    'auth.password_reset': 'Password reset completed',
     'admin.user.role.update': 'User access changed',
     'maintenance.create': 'Maintenance request created',
+    'maintenance.update': 'Maintenance request edited',
+    'maintenance.delete': 'Maintenance request deleted',
     'maintenance.assign': 'Request assignment changed',
     'maintenance.status': 'Request status changed',
     'maintenance.note.create': 'Request note added'
@@ -37,10 +42,10 @@ const eventCategory = (action) => {
 const categoryTone = { access: 'danger', authentication: 'active', operations: 'neutral' };
 const categoryLabel = { access: 'Access', authentication: 'Authentication', operations: 'Operations' };
 
-const parseAuditDate = (value) => value ? new Date(`${String(value).replace(' ', 'T')}Z`) : null;
+const parseAuditDate = parseTimestamp;
 const relativeTime = (value) => {
   const date = parseAuditDate(value);
-  if (!date || Number.isNaN(date.getTime())) return 'Unknown time';
+  if (!date) return 'Unknown time';
   const seconds = Math.round((date.getTime() - Date.now()) / 1000);
   const ranges = [[60, 'second'], [60, 'minute'], [24, 'hour'], [7, 'day']];
   let amount = seconds;

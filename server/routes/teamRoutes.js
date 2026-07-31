@@ -58,15 +58,20 @@ router.get('/', route((req, res) => {
   res.json({ success: true, data: teams });
 }));
 
-// Get single team with members
+// Get single team with members.
+// Requesters ('user') can reach this page to see who looks after an asset, but
+// they are outside the maintenance organisation, so they get names and roles
+// without the address book. GET /teams/users/all is manager-only for the same
+// reason and this endpoint must not become a way around it.
 router.get('/:id', route((req, res) => {
   const team = findTeam(req.params.id);
+  const showContactDetails = ['technician', 'manager', 'admin'].includes(req.user.role);
 
   const members = db.prepare(`
     SELECT
       u.id,
       u.name,
-      u.email,
+      ${showContactDetails ? 'u.email' : 'NULL as email'},
       u.role,
       tm.created_at as joined_at
     FROM team_members tm

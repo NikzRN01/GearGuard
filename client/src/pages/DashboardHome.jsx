@@ -6,6 +6,7 @@ import PageHeader from '../components/ui/PageHeader';
 import Panel from '../components/ui/Panel';
 import StatusBadge from '../components/ui/StatusBadge';
 import { api } from '../services/api';
+import { formatTimestampDate, parseTimestamp } from '../services/datetime';
 
 const statusKey = (status) => String(status || 'new').trim().toLowerCase().replaceAll(' ', '_');
 const isResolved = (status) => ['repaired', 'scrap', 'completed', 'closed'].includes(statusKey(status));
@@ -43,7 +44,7 @@ export default function DashboardHome() {
     const query = search.trim().toLowerCase();
     return requests
       .filter((request) => !query || [request.subject, request.equipment_name, request.work_center_name, request.status, request.assigned_to_name].some((field) => String(field || '').toLowerCase().includes(query)))
-      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+      .sort((a, b) => (parseTimestamp(b.created_at)?.getTime() || 0) - (parseTimestamp(a.created_at)?.getTime() || 0))
       .slice(0, 8);
   }, [requests, search]);
 
@@ -76,7 +77,7 @@ export default function DashboardHome() {
           <div className="table-wrap user-request-table-wrap">
             <table className="table user-request-table">
               <thead><tr><th>Request</th><th>Asset</th><th>Assigned to</th><th>Status</th><th>Submitted</th><th /></tr></thead>
-              <tbody>{visibleRequests.map((request) => <tr key={request.id}><td><strong>{request.subject || 'Untitled request'}</strong></td><td>{request.equipment_name || request.work_center_name || 'Not specified'}</td><td>{request.assigned_to_name || 'Awaiting assignment'}</td><td><StatusBadge status={request.status} /></td><td>{request.created_at ? new Date(request.created_at).toLocaleDateString() : '—'}</td><td><Button size="small" variant="tertiary" onClick={() => navigate(`/app/requests?request_id=${request.id}`)}>View</Button></td></tr>)}</tbody>
+              <tbody>{visibleRequests.map((request) => <tr key={request.id}><td><strong>{request.subject || 'Untitled request'}</strong></td><td>{request.equipment_name || request.work_center_name || 'Not specified'}</td><td>{request.assigned_to_name || 'Awaiting assignment'}</td><td><StatusBadge status={request.status} /></td><td>{formatTimestampDate(request.created_at)}</td><td><Button size="small" variant="tertiary" onClick={() => navigate(`/app/requests?request_id=${request.id}`)}>View</Button></td></tr>)}</tbody>
             </table>
           </div>
         )}

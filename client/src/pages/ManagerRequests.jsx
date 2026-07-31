@@ -10,6 +10,7 @@ import StatusBadge from '../components/ui/StatusBadge';
 import SelectMenu from '../components/ui/SelectMenu';
 import Field from '../components/ui/Field';
 import Input from '../components/ui/Input';
+import { formatTimestamp } from '../services/datetime';
 
 const CLOSED_STATUSES = new Set(['repaired', 'scrap', 'completed', 'closed']);
 const isOpen = (request) => !CLOSED_STATUSES.has(String(request.status || '').toLowerCase());
@@ -208,7 +209,7 @@ export default function ManagerRequests() {
 
               <div className="manager-history">
                 <h3>Notes</h3>
-                {detail.notes?.length ? detail.notes.map((note) => <article key={note.id}><p>{note.message}</p><time>{note.created_at ? new Date(note.created_at).toLocaleString() : ''}</time></article>) : <EmptyState compact title="No notes yet" description="Notes added to this request will appear here." />}
+                {detail.notes?.length ? detail.notes.map((note) => <article key={note.id}><p>{note.message}</p><time>{formatTimestamp(note.created_at, '')}</time></article>) : <EmptyState compact title="No notes yet" description="Notes added to this request will appear here." />}
               </div>
             </>
           ) : <EmptyState tone="error" title="Request unavailable" description="This request could not be displayed." />}
