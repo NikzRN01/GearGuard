@@ -1,7 +1,9 @@
 const express = require('express');
 const db = require('../database');
+const { authorize } = require('../middleware/auth');
 
 const router = express.Router();
+router.use(authorize('user', 'technician', 'manager'));
 
 // List work centers with optional filters
 router.get('/', (req, res) => {
@@ -55,7 +57,7 @@ router.get('/:id', (req, res) => {
 });
 
 // Create work center
-router.post('/', (req, res) => {
+router.post('/', authorize('manager', 'admin'), (req, res) => {
   try {
     const {
       name,
@@ -100,7 +102,7 @@ router.post('/', (req, res) => {
 });
 
 // Update work center
-router.put('/:id', (req, res) => {
+router.put('/:id', authorize('manager', 'admin'), (req, res) => {
   try {
     const { id } = req.params;
     const existing = db.prepare('SELECT id FROM work_centers WHERE id = ?').get(id);
@@ -151,7 +153,7 @@ router.put('/:id', (req, res) => {
 });
 
 // Soft delete (deactivate) work center
-router.delete('/:id', (req, res) => {
+router.delete('/:id', authorize('manager', 'admin'), (req, res) => {
   try {
     const { id } = req.params;
     const existing = db.prepare('SELECT id FROM work_centers WHERE id = ?').get(id);
@@ -184,7 +186,7 @@ router.get('/:id/alternatives', (req, res) => {
   }
 });
 
-router.post('/:id/alternatives', (req, res) => {
+router.post('/:id/alternatives', authorize('manager', 'admin'), (req, res) => {
   try {
     const { id } = req.params;
     const { alternative_work_center_id } = req.body;
@@ -207,7 +209,7 @@ router.post('/:id/alternatives', (req, res) => {
   }
 });
 
-router.delete('/:id/alternatives/:altId', (req, res) => {
+router.delete('/:id/alternatives/:altId', authorize('manager', 'admin'), (req, res) => {
   try {
     const { id, altId } = req.params;
     const existing = db.prepare('SELECT id FROM work_center_alternatives WHERE id = ? AND work_center_id = ?').get(altId, id);

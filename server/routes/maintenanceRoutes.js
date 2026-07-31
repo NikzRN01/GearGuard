@@ -1,7 +1,9 @@
 const express = require('express');
 const db = require('../database');
+const { authorize, audit } = require('../middleware/auth');
 
 const router = express.Router();
+router.use(authorize('user', 'technician', 'manager'));
 
 // Get all maintenance requests
 router.get('/', (req, res) => {
@@ -63,6 +65,14 @@ router.get('/', (req, res) => {
       query += ' AND mr.work_center_id = ?';
       params.push(work_center_id);
     }
+
+    if (req.user.role === 'technician') {
+      query += ' AND mr.assigned_to_user_id = ?';
+      params.push(req.user.id);
+    } else if (req.user.role === 'user') {
+      query += ' AND mr.created_by_user_id = ?';
+      params.push(req.user.id);
+    }
     
     query += ' ORDER BY mr.created_at DESC';
     
@@ -104,6 +114,14 @@ router.get('/calendar', (req, res) => {
     if (end_date) {
       query += ' AND DATE(mr.scheduled_date) <= DATE(?)';
       params.push(end_date);
+    }
+
+    if (req.user.role === 'technician') {
+      query += ' AND mr.assigned_to_user_id = ?';
+      params.push(req.user.id);
+    } else if (req.user.role === 'user') {
+      query += ' AND mr.created_by_user_id = ?';
+      params.push(req.user.id);
     }
     
     query += ' ORDER BY mr.scheduled_date ASC';
@@ -147,6 +165,11 @@ router.get('/:id', (req, res) => {
     if (!request) {
       return res.status(404).json({ success: false, message: 'Maintenance request not found' });
     }
+
+    const canRead = ['manager', 'admin'].includes(req.user.role)
+      || (req.user.role === 'technician' && Number(request.assigned_to_user_id) === Number(req.user.id))
+      || (req.user.role === 'user' && Number(request.created_by_user_id) === Number(req.user.id));
+    if (!canRead) return res.status(403).json({ success: false, message: 'You do not have access to this request' });
     
     // Get notes for this request
     const notes = db.prepare(`
@@ -175,15 +198,14 @@ router.post('/', (req, res) => {
       equipment_id,
       work_center_id,
       team_id,
-      scheduled_date,
-      created_by_user_id
+      scheduled_date
     } = req.body;
     
     // Validate required fields
-    if (!type || !subject || (!equipment_id && !work_center_id) || (equipment_id && work_center_id) || !created_by_user_id) {
+    if (!type || !subject || (!equipment_id && !work_center_id) || (equipment_id && work_center_id)) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Type, subject, creator, and exactly one of equipment or work center are required' 
+        message: 'Type, subject, and exactly one of equipment or work center are required'
       });
     }
     
@@ -203,7 +225,7 @@ router.post('/', (req, res) => {
       });
     }
     
-    let resolvedTeamId = team_id || null;
+    let resolvedTeamId = ['manager', 'admin'].includes(req.user.role) ? (team_id || null) : null;
     let equipmentName = null;
     let workCenterName = null;
 
@@ -225,15 +247,6 @@ router.post('/', (req, res) => {
       workCenterName = wc.name;
     }
     
-    // Check if user exists
-    const user = db.prepare('SELECT id FROM users WHERE id = ?').get(created_by_user_id);
-    if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'User not found' 
-      });
-    }
-    
     const stmt = db.prepare(`
       INSERT INTO maintenance_requests (
         type, subject, equipment_id, work_center_id, team_id, scheduled_date, 
@@ -249,8 +262,10 @@ router.post('/', (req, res) => {
       resolvedTeamId,
       scheduled_date || null,
       'new', // Default status
-      created_by_user_id
+      req.user.id
     );
+
+    audit(req.user.id, 'maintenance.create', 'maintenance_request', result.lastInsertRowid);
     
     res.status(201).json({ 
       success: true, 
@@ -277,9 +292,16 @@ router.patch('/:id/assign', (req, res) => {
     }
     
     // Check if request exists
-    const request = db.prepare('SELECT id, team_id, status FROM maintenance_requests WHERE id = ?').get(id);
+    const request = db.prepare('SELECT id, team_id, status, assigned_to_user_id FROM maintenance_requests WHERE id = ?').get(id);
     if (!request) {
       return res.status(404).json({ success: false, message: 'Maintenance request not found' });
+    }
+
+    if (!['manager', 'admin', 'technician'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'You do not have permission to assign requests' });
+    }
+    if (req.user.role === 'technician' && (Number(user_id) !== Number(req.user.id) || (request.assigned_to_user_id && Number(request.assigned_to_user_id) !== Number(req.user.id)))) {
+      return res.status(403).json({ success: false, message: 'Technicians may only assign an unassigned request to themselves' });
     }
     
     // Check if user exists and has appropriate role
@@ -314,6 +336,8 @@ router.patch('/:id/assign', (req, res) => {
       SET assigned_to_user_id = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(user_id, id);
+
+    audit(req.user.id, 'maintenance.assign', 'maintenance_request', id, { assigned_to_user_id: Number(user_id) });
     
     res.json({ 
       success: true, 
@@ -347,9 +371,13 @@ router.patch('/:id/status', (req, res) => {
     }
     
     // Check if request exists
-    const request = db.prepare('SELECT id, status FROM maintenance_requests WHERE id = ?').get(id);
+    const request = db.prepare('SELECT id, status, assigned_to_user_id FROM maintenance_requests WHERE id = ?').get(id);
     if (!request) {
       return res.status(404).json({ success: false, message: 'Maintenance request not found' });
+    }
+
+    if (!['manager', 'admin'].includes(req.user.role) && !(req.user.role === 'technician' && Number(request.assigned_to_user_id) === Number(req.user.id))) {
+      return res.status(403).json({ success: false, message: 'Only the assigned technician or a manager may update status' });
     }
     
     // Validate status transition
@@ -377,6 +405,8 @@ router.patch('/:id/status', (req, res) => {
     `);
     
     stmt.run(status, duration_hours, id);
+
+    audit(req.user.id, 'maintenance.status', 'maintenance_request', id, { from: request.status, to: status });
     
     res.json({ 
       success: true, 
@@ -402,13 +432,20 @@ router.post('/:id/notes', (req, res) => {
     }
     
     // Check if request exists
-    const request = db.prepare('SELECT id FROM maintenance_requests WHERE id = ?').get(id);
+    const request = db.prepare('SELECT id, assigned_to_user_id, created_by_user_id FROM maintenance_requests WHERE id = ?').get(id);
     if (!request) {
       return res.status(404).json({ success: false, message: 'Maintenance request not found' });
     }
+
+    const canComment = ['manager', 'admin'].includes(req.user.role)
+      || (req.user.role === 'technician' && Number(request.assigned_to_user_id) === Number(req.user.id))
+      || (req.user.role === 'user' && Number(request.created_by_user_id) === Number(req.user.id));
+    if (!canComment) return res.status(403).json({ success: false, message: 'You do not have access to this request' });
     
     const stmt = db.prepare('INSERT INTO notes (request_id, message) VALUES (?, ?)');
     const result = stmt.run(id, message);
+
+    audit(req.user.id, 'maintenance.note.create', 'maintenance_request', id, { note_id: Number(result.lastInsertRowid) });
     
     res.status(201).json({ 
       success: true, 
@@ -422,7 +459,7 @@ router.post('/:id/notes', (req, res) => {
 });
 
 // Update maintenance request details
-router.put('/:id', (req, res) => {
+router.put('/:id', authorize('manager', 'admin'), (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -513,7 +550,7 @@ router.put('/:id', (req, res) => {
 });
 
 // Delete maintenance request
-router.delete('/:id', (req, res) => {
+router.delete('/:id', authorize('manager', 'admin'), (req, res) => {
   try {
     const { id } = req.params;
     

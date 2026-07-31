@@ -1,10 +1,12 @@
 const express = require('express');
 const db = require('../database');
+const { authorize } = require('../middleware/auth');
 
 const router = express.Router();
+router.use(authorize('user', 'technician', 'manager'));
 
 // Get all users (for team member assignment)
-router.get('/users/all', (req, res) => {
+router.get('/users/all', authorize('manager'), (req, res) => {
   try {
     const users = db.prepare(`
       SELECT 
@@ -80,7 +82,7 @@ router.get('/:id', (req, res) => {
 });
 
 // Create new team
-router.post('/', (req, res) => {
+router.post('/', authorize('manager', 'admin'), (req, res) => {
   try {
     const { name } = req.body;
     
@@ -115,7 +117,7 @@ router.post('/', (req, res) => {
 });
 
 // Update team
-router.put('/:id', (req, res) => {
+router.put('/:id', authorize('manager', 'admin'), (req, res) => {
   try {
     const { id } = req.params;
     const { name } = req.body;
@@ -155,7 +157,7 @@ router.put('/:id', (req, res) => {
 });
 
 // Delete team
-router.delete('/:id', (req, res) => {
+router.delete('/:id', authorize('manager', 'admin'), (req, res) => {
   try {
     const { id } = req.params;
     
@@ -187,7 +189,7 @@ router.delete('/:id', (req, res) => {
 });
 
 // Add member to team
-router.post('/:id/members', (req, res) => {
+router.post('/:id/members', authorize('manager', 'admin'), (req, res) => {
   try {
     const { id } = req.params;
     const { user_id } = req.body;
@@ -234,7 +236,7 @@ router.post('/:id/members', (req, res) => {
 });
 
 // Remove member from team
-router.delete('/:id/members/:userId', (req, res) => {
+router.delete('/:id/members/:userId', authorize('manager', 'admin'), (req, res) => {
   try {
     const { id, userId } = req.params;
     
@@ -260,7 +262,7 @@ router.delete('/:id/members/:userId', (req, res) => {
 });
 
 // Get available users (not in a specific team or all users)
-router.get('/:id/available-users', (req, res) => {
+router.get('/:id/available-users', authorize('manager', 'admin'), (req, res) => {
   try {
     const { id } = req.params;
     

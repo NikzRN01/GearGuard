@@ -6,8 +6,12 @@ import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
 import PageHeader from '../components/ui/PageHeader';
 import Panel from '../components/ui/Panel';
+import SelectMenu from '../components/ui/SelectMenu';
+import { getSessionUser } from '../services/session';
 
 export default function Teams() {
+    const currentUser = getSessionUser();
+    const canManageTeams = ['manager', 'admin'].includes(currentUser?.role);
     const [showForm, setShowForm] = useState(false);
     const [showAddMember, setShowAddMember] = useState(false);
     const [selectedTeam, setSelectedTeam] = useState(null);
@@ -34,8 +38,17 @@ export default function Teams() {
     // Fetch teams from backend on component mount
     useEffect(() => {
         fetchTeams();
-        fetchUsers();
+        if (canManageTeams) fetchUsers();
     }, []);
+
+    useEffect(() => {
+        if (!showForm && !showAddMember) return undefined;
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = previousOverflow;
+        };
+    }, [showForm, showAddMember]);
 
     async function fetchTeams() {
         setLoading(true);
@@ -123,8 +136,8 @@ export default function Teams() {
         setSelectedTeam(null);
     }
 
-    function onMemberChange(e) {
-        setMemberForm({ user_id: e.target.value });
+    function onMemberChange(value) {
+        setMemberForm({ user_id: value });
     }
 
     async function onAddMember(e) {
@@ -152,7 +165,7 @@ export default function Teams() {
 
     return (
         <div className="container manager-page manager-teams-page">
-            <PageHeader eyebrow="Manager workspace" title="Teams" description="Manage maintenance teams and their members." actions={<><Button onClick={openNew}>Create team</Button><Button variant="secondary" onClick={fetchTeams} disabled={loading}>{loading ? 'Refreshing...' : 'Refresh'}</Button></>} />
+            <PageHeader eyebrow={canManageTeams ? 'Manager workspace' : 'Team reference'} title="Teams" description={canManageTeams ? 'Manage maintenance teams and their members.' : 'Review maintenance teams and their members.'} actions={<>{canManageTeams && <Button onClick={openNew}>Create team</Button>}<Button variant="secondary" onClick={fetchTeams} disabled={loading}>{loading ? 'Refreshing...' : 'Refresh'}</Button></>} />
 
             {error && <Alert tone="danger" title="Teams could not be loaded" action={<Button variant="secondary" size="small" onClick={fetchTeams}>Try again</Button>}>{error}</Alert>}
 
@@ -178,7 +191,7 @@ export default function Teams() {
                                     }
                                 </td>
                                 <td className="manager-team-action">
-                                    <Button variant="secondary" size="small" onClick={() => openAddMember(r)}>Add member</Button>
+                                    {canManageTeams ? <Button variant="secondary" size="small" onClick={() => openAddMember(r)}>Add member</Button> : <span className="manager-muted-cell">View only</span>}
                                 </td>
                             </tr>
                         ))}
@@ -230,19 +243,15 @@ export default function Teams() {
                         <form onSubmit={onAddMember}>
                             <div className="input-group">
                                 <label>Select User *</label>
-                                <select
-                                    className="input-select modal-input"
+                                <SelectMenu
+                                    ariaLabel="Select a user to add"
                                     value={memberForm.user_id}
                                     onChange={onMemberChange}
-                                    required
-                                >
-                                    <option value="">-- Select a user --</option>
-                                    {users.map(user => (
-                                        <option key={user.id} value={user.id}>
-                                            {user.name} ({user.email}) - {user.role}
-                                        </option>
-                                    ))}
-                                </select>
+                                    options={[
+                                        { value: '', label: 'Select a user' },
+                                        ...users.map((user) => ({ value: String(user.id), label: `${user.name} (${user.email}) - ${user.role}` }))
+                                    ]}
+                                />
                             </div>
 
                             {memberError && <Alert tone="danger" title="Member could not be added">{memberError}</Alert>}

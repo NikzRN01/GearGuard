@@ -30,6 +30,27 @@
   font-family: var(--gg-font-sans);
 }
 
+.auth-layout .gg-select-menu__trigger {
+  min-height: 48px;
+  padding-inline: 14px;
+  background: var(--gg-color-surface);
+  color: var(--gg-color-text);
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.auth-layout .gg-select-menu__trigger:hover,
+.auth-layout .gg-select-menu__trigger[aria-expanded='true'] {
+  border-color: var(--gg-color-focus);
+  background: color-mix(in srgb, var(--gg-color-primary-soft) 18%, var(--gg-color-surface));
+}
+
+.auth-layout .gg-select-menu__popover {
+  z-index: 100;
+  background: var(--gg-color-surface);
+  box-shadow: 0 16px 36px rgba(35, 33, 44, 0.16);
+}
+
 .auth-shell {
   position: relative;
   z-index: 1;

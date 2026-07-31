@@ -1,7 +1,9 @@
 const express = require('express');
 const db = require('../database');
+const { authorize } = require('../middleware/auth');
 
 const router = express.Router();
+router.use(authorize('user', 'technician', 'manager'));
 
 // Get all equipment
 router.get('/', (req, res) => {
@@ -70,7 +72,7 @@ router.get('/:id', (req, res) => {
 });
 
 // Create new equipment
-router.post('/', (req, res) => {
+router.post('/', authorize('manager', 'admin'), (req, res) => {
   try {
     const {
       name,
@@ -143,7 +145,7 @@ router.post('/', (req, res) => {
 });
 
 // Update equipment
-router.put('/:id', (req, res) => {
+router.put('/:id', authorize('manager', 'admin'), (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -224,7 +226,7 @@ router.put('/:id', (req, res) => {
 });
 
 // Delete equipment
-router.delete('/:id', (req, res) => {
+router.delete('/:id', authorize('manager', 'admin'), (req, res) => {
   try {
     const { id } = req.params;
     

@@ -6,7 +6,7 @@ import AuthCard from '../shared/AuthCard';
 export default function ResetPassword() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [email, setEmail] = useState('');
+  const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -16,9 +16,9 @@ export default function ResetPassword() {
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    const emailParam = searchParams.get('email');
-    if (emailParam) {
-      setEmail(emailParam);
+    const tokenParam = searchParams.get('token');
+    if (tokenParam) {
+      setResetToken(tokenParam);
     } else {
       setError('Invalid reset link. Please request a new password reset.');
     }
@@ -32,7 +32,7 @@ export default function ResetPassword() {
 
     try {
       const { data } = await api.post('/auth/reset-password', {
-        email,
+        token: resetToken,
         newPassword,
         confirmPassword
       });
@@ -48,8 +48,6 @@ export default function ResetPassword() {
     } catch (err) {
       if (err?.code === 'ERR_NETWORK') {
         setError('Unable to connect to server. Please check your connection.');
-      } else if (err?.response?.status === 404) {
-        setError('Account not found. Please check your email address.');
       } else if (err?.response?.status === 400) {
         setError(err?.response?.data?.message || 'Invalid input. Please check your passwords.');
       } else {
@@ -70,20 +68,6 @@ export default function ResetPassword() {
     >
       <form onSubmit={onSubmit} className="auth-form">
         <div className="input-group">
-          <label htmlFor="email">Email Address</label>
-          <input 
-            id="email"
-            type="email" 
-            value={email} 
-            onChange={(e) => setEmail(e.target.value)} 
-            placeholder="you@company.com"
-            disabled
-            required 
-            style={{ backgroundColor: '#111010ff', cursor: 'not-allowed' }}
-          />
-        </div>
-
-        <div className="input-group">
           <label htmlFor="newPassword">New Password</label>
           <div className="password-input">
             <input 
@@ -93,7 +77,7 @@ export default function ResetPassword() {
               onChange={(e) => setNewPassword(e.target.value)} 
               placeholder="Enter new password"
               required 
-              disabled={loading || !email}
+              disabled={loading || !resetToken}
             />
             <button 
               type="button" 
@@ -126,7 +110,7 @@ export default function ResetPassword() {
               onChange={(e) => setConfirmPassword(e.target.value)} 
               placeholder="Re-enter new password"
               required 
-              disabled={loading || !email}
+              disabled={loading || !resetToken}
             />
             <button 
               type="button" 
@@ -162,7 +146,7 @@ export default function ResetPassword() {
         {error && <div className="alert alert-error" role="alert">{error}</div>}
         {success && <div className="alert alert-success" role="alert">{success}</div>}
 
-        <button type="submit" disabled={loading || !email} className="btn-primary">
+        <button type="submit" disabled={loading || !resetToken} className="btn-primary">
           {loading ? (
             <><span className="spinner" /> Resetting Password...</>
           ) : (

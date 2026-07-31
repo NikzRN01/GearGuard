@@ -7,9 +7,11 @@ import Alert from '../components/ui/Alert';
 import Button from '../components/ui/Button';
 import Field from '../components/ui/Field';
 import Input from '../components/ui/Input';
+import SelectMenu from '../components/ui/SelectMenu';
 
 export default function Login() {
   const navigate = useNavigate();
+  const [userType, setUserType] = useState('user');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -26,10 +28,11 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      const { data } = await api.post('/auth/login', { email, password });
+      const { data } = await api.post('/auth/login', { email, password, role: userType });
       if (data?.success) {
         // store minimal user session for demo
         sessionStorage.setItem('user', JSON.stringify(data.user));
+        sessionStorage.setItem('csrf_token', data.csrfToken);
         navigate(getDefaultAppPath(data.user));
       } else {
         setError(data?.message || 'Login failed');
@@ -87,6 +90,21 @@ export default function Login() {
         subtitle="Sign in to review equipment, requests, schedules, and assigned work."
       >
         <form onSubmit={onSubmit} className="auth-form">
+        <div className="input-group">
+          <label>Sign in as</label>
+          <SelectMenu
+            value={userType}
+            onChange={setUserType}
+            ariaLabel="Sign in as"
+            options={[
+              { value: 'user', label: 'User' },
+              { value: 'technician', label: 'Technician' },
+              { value: 'manager', label: 'Manager' },
+              { value: 'admin', label: 'Admin' }
+            ]}
+          />
+        </div>
+
         <div className="input-group">
           <label htmlFor="email">Email Address</label>
           <input 

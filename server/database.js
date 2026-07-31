@@ -30,6 +30,55 @@ const createUsersTable = () => {
   db.prepare(query).run();
 };
 
+const createSessionsTable = () => {
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      token_hash TEXT NOT NULL UNIQUE,
+      csrf_token TEXT NOT NULL,
+      user_id INTEGER NOT NULL,
+      expires_at DATETIME NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `).run();
+  db.prepare('CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)').run();
+  db.prepare('CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)').run();
+};
+
+const createAuditLogTable = () => {
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      actor_user_id INTEGER,
+      action TEXT NOT NULL,
+      resource_type TEXT NOT NULL,
+      resource_id TEXT,
+      metadata_json TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
+    )
+  `).run();
+  db.prepare('CREATE INDEX IF NOT EXISTS idx_audit_log_actor ON audit_log(actor_user_id)').run();
+  db.prepare('CREATE INDEX IF NOT EXISTS idx_audit_log_resource ON audit_log(resource_type, resource_id)').run();
+};
+
+const createPasswordResetTokensTable = () => {
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      token_hash TEXT NOT NULL UNIQUE,
+      user_id INTEGER NOT NULL,
+      expires_at DATETIME NOT NULL,
+      used_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `).run();
+  db.prepare('CREATE INDEX IF NOT EXISTS idx_password_reset_expires ON password_reset_tokens(expires_at)').run();
+};
+
 // Create teams table
 const createTeamsTable = () => {
   const query = `
@@ -232,6 +281,7 @@ const addWorkCenterIdColumn = () => {
 };
 
 const seedDemoData = () => {
+  let demoPasswordHash;
   const teamCount = db.prepare('SELECT COUNT(1) as c FROM teams').get()?.c || 0;
   if (teamCount === 0) {
     const insertTeam = db.prepare('INSERT INTO teams (name) VALUES (?)');
@@ -245,11 +295,11 @@ const seedDemoData = () => {
 
   const userCount = db.prepare('SELECT COUNT(1) as c FROM users').get()?.c || 0;
   if (userCount === 0) {
-    const pwd = bcrypt.hashSync('Password123!', 10);
+    demoPasswordHash = bcrypt.hashSync('Password123!', 10);
     const insertUser = db.prepare('INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)');
-    const managerId = insertUser.run('Mitchell Admin', 'manager@demo.com', pwd, 'manager').lastInsertRowid;
-    const tech1Id = insertUser.run('Marc Demo', 'tech1@demo.com', pwd, 'technician').lastInsertRowid;
-    const tech2Id = insertUser.run('Anas Makari', 'tech2@demo.com', pwd, 'technician').lastInsertRowid;
+    const managerId = insertUser.run('Mitchell Admin', 'manager@demo.com', demoPasswordHash, 'manager').lastInsertRowid;
+    const tech1Id = insertUser.run('Marc Demo', 'tech1@demo.com', demoPasswordHash, 'technician').lastInsertRowid;
+    const tech2Id = insertUser.run('Anas Makari', 'tech2@demo.com', demoPasswordHash, 'technician').lastInsertRowid;
 
     if (internalTeam?.id) {
       const addMember = db.prepare('INSERT OR IGNORE INTO team_members (team_id, user_id) VALUES (?, ?)');
@@ -257,6 +307,15 @@ const seedDemoData = () => {
       addMember.run(internalTeam.id, tech1Id);
       addMember.run(internalTeam.id, tech2Id);
     }
+  }
+
+  // Keep the local demo database usable after introducing the admin workspace.
+  // Checking by email makes this idempotent for both fresh and existing databases.
+  const demoAdmin = db.prepare('SELECT id FROM users WHERE email = ?').get('admin@demo.com');
+  if (!demoAdmin) {
+    demoPasswordHash ||= bcrypt.hashSync('Password123!', 10);
+    db.prepare('INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)')
+      .run('GearGuard Admin', 'admin@demo.com', demoPasswordHash, 'admin');
   }
 
   const equipmentCount = db.prepare('SELECT COUNT(1) as c FROM equipment').get()?.c || 0;
@@ -276,6 +335,9 @@ const seedDemoData = () => {
 // Initialize all tables
 const initializeDatabase = () => {
   createUsersTable();
+  createSessionsTable();
+  createAuditLogTable();
+  createPasswordResetTokensTable();
   createTeamsTable();
   createTeamMembersTable();
   createEquipmentTable();

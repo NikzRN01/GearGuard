@@ -2,8 +2,13 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const db = require('../database');
 const nodemailer = require("nodemailer");
+const crypto = require('crypto');
+const { authenticate, requireCsrf, createSession, setSessionCookie, clearSessionCookie, destroySession, audit } = require('../middleware/auth');
+const rateLimit = require('../middleware/rateLimit');
 
 const router = express.Router();
+const loginRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
+const recoveryRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 5 });
 
 // Email validation regex
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -54,11 +59,11 @@ router.post('/signup', async (req, res) => {
     }
 
     // Validate role if provided
-    const validRoles = ['admin', 'manager', 'technician', 'user'];
+    const validRoles = ['technician', 'user'];
     if (role && !validRoles.includes(role)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid role. Must be: admin, manager, technician, or user'
+        message: 'Public signup is limited to user or technician accounts'
       });
     }
 
@@ -119,7 +124,7 @@ router.post('/signup', async (req, res) => {
 });
 
 // Login Route
-router.post('/login', async (req, res) => {
+router.post('/login', loginRateLimit, async (req, res) => {
   try {
     const { email, password, role } = req.body;
 
@@ -133,12 +138,15 @@ router.post('/login', async (req, res) => {
 
     // Check if user exists
     const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'Account not found'
-      });
-    }
+    if (!user) return res.status(200).json({ success: true, message: 'If that account exists, a reset link has been sent' });
+
+    const resetToken = crypto.randomBytes(32).toString('base64url');
+    const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const resetExpiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ? OR expires_at <= CURRENT_TIMESTAMP').run(user.id);
+    db.prepare('INSERT INTO password_reset_tokens (token_hash, user_id, expires_at) VALUES (?, ?, ?)').run(resetTokenHash, user.id, resetExpiresAt);
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const resetUrl = `${clientUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
 
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -157,13 +165,19 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    const session = createSession(user.id);
+    setSessionCookie(res, session.token);
+    audit(user.id, 'auth.login', 'session', null, { role: user.role });
+
     // Successful login - return user data (excluding password)
     const { password: _, ...userWithoutPassword } = user;
 
     res.status(200).json({
       success: true,
       message: 'Login successful',
-      user: userWithoutPassword
+      user: userWithoutPassword,
+      csrfToken: session.csrfToken,
+      expiresAt: session.expiresAt
     });
 
   } catch (error) {
@@ -175,8 +189,19 @@ router.post('/login', async (req, res) => {
   }
 });
 
+router.get('/me', authenticate, (req, res) => {
+  res.json({ success: true, user: req.user, csrfToken: req.authSession.csrfToken, expiresAt: req.authSession.expiresAt });
+});
+
+router.post('/logout', authenticate, requireCsrf, (req, res) => {
+  audit(req.user.id, 'auth.logout', 'session');
+  destroySession(req);
+  clearSessionCookie(res);
+  res.json({ success: true, message: 'Logged out successfully' });
+});
+
 // Forget Password Route
-router.post("/forget-password", async (req, res) => {
+router.post("/forget-password", recoveryRateLimit, async (req, res) => {
   try {
     const { email } = req.body;
     
@@ -209,7 +234,7 @@ router.post("/forget-password", async (req, res) => {
           <p>Hello <strong>${user.name}</strong>,</p>
           <p>You requested to reset your password for your GearGuard account.</p>
           <p>Click the button below to reset your password:</p>
-          <a href="http://localhost:5173/reset-password?email=${email}" 
+          <a href="${resetUrl}"
              style="display: inline-block; padding: 12px 24px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0;">
             Reset Password
           </a>
@@ -240,23 +265,15 @@ router.post("/forget-password", async (req, res) => {
 });
 
 // Reset Password Route
-router.post("/reset-password", async (req, res) => {
+router.post("/reset-password", recoveryRateLimit, async (req, res) => {
   try {
-    const { email, newPassword, confirmPassword } = req.body;
+    const { token, newPassword, confirmPassword } = req.body;
     
     // Validate required fields
-    if (!email || !newPassword || !confirmPassword) {
+    if (!token || !newPassword || !confirmPassword) {
       return res.status(400).json({
         success: false,
-        message: 'Email, new password, and confirm password are required'
-      });
-    }
-    
-    // Validate email format
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid email format'
+        message: 'Reset token, new password, and confirm password are required'
       });
     }
     
@@ -277,20 +294,25 @@ router.post("/reset-password", async (req, res) => {
       });
     }
     
-    // Check if user exists
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'Account not found'
-      });
-    }
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const resetRecord = db.prepare(`
+      SELECT prt.id, prt.user_id
+      FROM password_reset_tokens prt
+      WHERE prt.token_hash = ? AND prt.used_at IS NULL AND prt.expires_at > CURRENT_TIMESTAMP
+    `).get(tokenHash);
+    if (!resetRecord) return res.status(400).json({ success: false, message: 'Reset link is invalid or expired' });
     
     // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     
     // Update password in database
-    db.prepare('UPDATE users SET password = ? WHERE email = ?').run(hashedPassword, email);
+    const resetPassword = db.transaction(() => {
+      db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashedPassword, resetRecord.user_id);
+      db.prepare('UPDATE password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE id = ?').run(resetRecord.id);
+      db.prepare('DELETE FROM sessions WHERE user_id = ?').run(resetRecord.user_id);
+    });
+    resetPassword();
+    audit(resetRecord.user_id, 'auth.password.reset', 'user', resetRecord.user_id);
     
     res.status(200).json({
       success: true,

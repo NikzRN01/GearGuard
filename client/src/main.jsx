@@ -8,6 +8,7 @@ import Landing from './pages/Landing.jsx';
 import DashboardHome from './pages/DashboardHome.jsx';
 import TechnicianDashboard from './pages/TechnicianDashboard.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
+import AdminUsers from './pages/AdminUsers.jsx';
 import ManagerOverview from './pages/ManagerOverview.jsx';
 import ManagerRequests from './pages/ManagerRequests.jsx';
 import ManagerWorkload from './pages/ManagerWorkload.jsx';
@@ -43,17 +44,18 @@ root.render(
           <Route index element={<RoleBasedHome />} />
           <Route path="home" element={<DashboardHome />} />
           <Route path="admin" element={<RoleRoute allowedRoles={['admin']}><AdminDashboard /></RoleRoute>} />
+          <Route path="admin/users" element={<RoleRoute allowedRoles={['admin']}><AdminUsers /></RoleRoute>} />
           <Route path="manager/overview" element={<RoleRoute allowedRoles={['manager']}><ManagerOverview /></RoleRoute>} />
           <Route path="manager/requests" element={<RoleRoute allowedRoles={['manager']}><ManagerRequests /></RoleRoute>} />
           <Route path="manager/requests/:requestId" element={<RoleRoute allowedRoles={['manager']}><ManagerRequests /></RoleRoute>} />
           <Route path="manager/schedule" element={<RoleRoute allowedRoles={['manager']}><Calendar /></RoleRoute>} />
           <Route path="manager/workload" element={<RoleRoute allowedRoles={['manager']}><ManagerWorkload /></RoleRoute>} />
-          <Route path="technician" element={<TechnicianDashboard />} />
-          <Route path="calendar" element={<Calendar />} />
-          <Route path="equipment/work-center" element={<WorkCenter />} />
-          <Route path="equipment/machine-tools" element={<MachineTools />} />
-          <Route path="requests" element={<Requests />} />
-          <Route path="teams" element={<Teams />} />
+          <Route path="technician" element={<RoleRoute allowedRoles={['technician']}><TechnicianDashboard /></RoleRoute>} />
+          <Route path="calendar" element={<RoleRoute allowedRoles={['user', 'manager', 'technician']}><Calendar /></RoleRoute>} />
+          <Route path="equipment/work-center" element={<RoleRoute allowedRoles={['user', 'manager', 'technician']}><WorkCenter /></RoleRoute>} />
+          <Route path="equipment/machine-tools" element={<RoleRoute allowedRoles={['user', 'manager', 'technician']}><MachineTools /></RoleRoute>} />
+          <Route path="requests" element={<RoleRoute allowedRoles={['user', 'manager', 'technician']}><Requests /></RoleRoute>} />
+          <Route path="teams" element={<RoleRoute allowedRoles={['user', 'manager', 'technician']}><Teams /></RoleRoute>} />
         </Route>
 
       </Routes>
