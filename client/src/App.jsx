@@ -17,8 +17,9 @@ export default function App() {
   const isTechnician = user?.role === 'technician';
   const isAdmin = user?.role === 'admin';
   const isManager = user?.role === 'manager';
-  const usesOperationsShell = isManager || isTechnician || isAdmin;
-  const workspaceLabel = isTechnician ? 'Technician' : isAdmin ? 'Admin' : 'Manager';
+  const isUser = user?.role === 'user';
+  const usesOperationsShell = isManager || isTechnician || isAdmin || isUser;
+  const workspaceLabel = isTechnician ? 'Technician' : isAdmin ? 'Admin' : isUser ? 'Requester' : 'Manager';
 
   const handleLogout = React.useCallback(async () => {
     try {
@@ -71,7 +72,7 @@ export default function App() {
   }, [isManagerMenuOpen]);
 
   return (
-    <div className={`app-layout ${usesOperationsShell ? `manager-shell ${isTechnician ? 'technician-shell' : isAdmin ? 'admin-shell' : ''}` : ''}`}>
+    <div className={`app-layout ${usesOperationsShell ? `manager-shell ${isTechnician ? 'technician-shell' : isAdmin ? 'admin-shell' : isUser ? 'user-shell technician-shell' : ''}` : ''}`}>
       {usesOperationsShell && (
         <header className="manager-mobile-header">
           <div className="manager-mobile-header__brand">
@@ -119,8 +120,16 @@ export default function App() {
         {usesOperationsShell ? (
           <div className="manager-sidebar__brand">
             <span className="manager-sidebar__mark" aria-hidden="true">G</span>
-            <span className="manager-sidebar__brand-copy"><strong>GearGuard</strong><span>{isAdmin ? 'System administration' : 'Maintenance operations'}</span></span>
+            <span className="manager-sidebar__brand-copy"><strong>GearGuard</strong><span>{isAdmin ? 'System administration' : isUser ? 'Maintenance requests' : 'Maintenance operations'}</span></span>
           </div>
+        ) : isUser ? (
+          <>
+            <p className="manager-sidebar__group-label">My workspace</p>
+            <NavLink to="/app/home" end>Home</NavLink>
+            <NavLink to="/app/requests">My Requests</NavLink>
+            <p className="manager-sidebar__group-label">Reference</p>
+            <NavLink to="/app/equipment/machine-tools">Equipment Directory</NavLink>
+          </>
         ) : (
           <div className="brand" style={{ marginTop: 4 }}>GearGuard</div>
         )}

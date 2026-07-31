@@ -16,6 +16,7 @@ import Calendar from './pages/Calendar.jsx';
 import WorkCenter from './pages/WorkCenter.jsx';
 import MachineTools from './pages/MachineTools.jsx';
 import Requests from './pages/Requests.jsx';
+import UserRequests from './pages/UserRequests.jsx';
 import Teams from './pages/Teams.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import RoleRoute from './shared/RoleRoute.jsx';
@@ -30,6 +31,8 @@ const RoleBasedHome = () => {
   return <Navigate to={user ? getDefaultAppPath(user) : '/login'} replace />;
 };
 
+const RoleBasedRequests = () => getSessionUser()?.role === 'user' ? <UserRequests /> : <Requests />;
+
 const root = createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
@@ -42,7 +45,7 @@ root.render(
 
         <Route path="/app" element={<RoleRoute><App /></RoleRoute>}>
           <Route index element={<RoleBasedHome />} />
-          <Route path="home" element={<DashboardHome />} />
+          <Route path="home" element={<RoleRoute allowedRoles={['user']}><DashboardHome /></RoleRoute>} />
           <Route path="admin" element={<RoleRoute allowedRoles={['admin']}><AdminDashboard /></RoleRoute>} />
           <Route path="admin/users" element={<RoleRoute allowedRoles={['admin']}><AdminUsers /></RoleRoute>} />
           <Route path="manager/overview" element={<RoleRoute allowedRoles={['manager']}><ManagerOverview /></RoleRoute>} />
@@ -54,7 +57,7 @@ root.render(
           <Route path="calendar" element={<RoleRoute allowedRoles={['user', 'manager', 'technician']}><Calendar /></RoleRoute>} />
           <Route path="equipment/work-center" element={<RoleRoute allowedRoles={['user', 'manager', 'technician']}><WorkCenter /></RoleRoute>} />
           <Route path="equipment/machine-tools" element={<RoleRoute allowedRoles={['user', 'manager', 'technician']}><MachineTools /></RoleRoute>} />
-          <Route path="requests" element={<RoleRoute allowedRoles={['user', 'manager', 'technician']}><Requests /></RoleRoute>} />
+          <Route path="requests" element={<RoleRoute allowedRoles={['user', 'manager', 'technician']}><RoleBasedRequests /></RoleRoute>} />
           <Route path="teams" element={<RoleRoute allowedRoles={['user', 'manager', 'technician']}><Teams /></RoleRoute>} />
         </Route>
 
