@@ -7,6 +7,7 @@ export default function ResetPassword() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
+  const [token, setToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -15,24 +16,36 @@ export default function ResetPassword() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Both parts of the emailed link are required: the token is what proves the
+  // request came from the account owner.
   useEffect(() => {
     const emailParam = searchParams.get('email');
-    if (emailParam) {
-      setEmail(emailParam);
-    } else {
+    const tokenParam = searchParams.get('token');
+    setEmail(emailParam || '');
+    setToken(tokenParam || '');
+    if (!emailParam || !tokenParam) {
       setError('Invalid reset link. Please request a new password reset.');
     }
   }, [searchParams]);
+
+  const linkIsValid = Boolean(email && token);
 
   const onSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
+
+    if (!linkIsValid) {
+      setError('Invalid reset link. Please request a new password reset.');
+      return;
+    }
+
     setLoading(true);
 
     try {
       const { data } = await api.post('/auth/reset-password', {
         email,
+        token,
         newPassword,
         confirmPassword
       });
@@ -78,8 +91,8 @@ export default function ResetPassword() {
             onChange={(e) => setEmail(e.target.value)} 
             placeholder="you@company.com"
             disabled
-            required 
-            style={{ backgroundColor: '#111010ff', cursor: 'not-allowed' }}
+            required
+            style={{ backgroundColor: 'var(--gg-color-surface-subtle)', cursor: 'not-allowed' }}
           />
         </div>
 
@@ -93,7 +106,7 @@ export default function ResetPassword() {
               onChange={(e) => setNewPassword(e.target.value)} 
               placeholder="Enter new password"
               required 
-              disabled={loading || !email}
+              disabled={loading || !linkIsValid}
             />
             <button 
               type="button" 
@@ -126,7 +139,7 @@ export default function ResetPassword() {
               onChange={(e) => setConfirmPassword(e.target.value)} 
               placeholder="Re-enter new password"
               required 
-              disabled={loading || !email}
+              disabled={loading || !linkIsValid}
             />
             <button 
               type="button" 
@@ -149,7 +162,7 @@ export default function ResetPassword() {
           </div>
         </div>
 
-        <div className="password-requirements" style={{ fontSize: '12px', color: '#666', marginTop: '-10px', marginBottom: '15px' }}>
+        <div className="password-requirements" style={{ fontSize: 'var(--gg-text-xs)', color: 'var(--gg-color-text-muted)', marginTop: '-10px', marginBottom: '15px' }}>
           <p style={{ margin: '5px 0' }}>Password must contain:</p>
           <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
             <li>At least 8 characters</li>
@@ -162,7 +175,7 @@ export default function ResetPassword() {
         {error && <div className="alert alert-error" role="alert">{error}</div>}
         {success && <div className="alert alert-success" role="alert">{success}</div>}
 
-        <button type="submit" disabled={loading || !email} className="btn-primary">
+        <button type="submit" disabled={loading || !linkIsValid} className="btn-primary">
           {loading ? (
             <><span className="spinner" /> Resetting Password...</>
           ) : (

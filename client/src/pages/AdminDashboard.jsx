@@ -16,14 +16,47 @@ const normalizeStatus = (status) => {
 
 const statusLabel = (statusKey) => statusKey.replaceAll('_', ' ');
 
-const STATUS_COLORS = {
-  new: '#f25f7a',
-  in_progress: '#f59e0b',
-  on_hold: '#7c83ff',
-  repaired: '#37c38a',
-  completed: '#37c38a',
-  scrap: '#8b95a8'
+/** Calendar-day key for a Date, in the viewer's own timezone. */
+const localDateKey = (date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+/**
+ * SQLite hands back "YYYY-MM-DD HH:MM:SS" in UTC with no offset marker, which
+ * JS would otherwise parse as local time. Normalise to a real instant first,
+ * then bucket by the viewer's local day so both sides of the comparison agree.
+ */
+const requestDateKey = (value) => {
+  if (!value) return '';
+  const raw = String(value).trim();
+  const iso = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(raw)
+    ? `${raw.replace(' ', 'T')}Z`
+    : raw;
+  const parsed = new Date(iso);
+  return Number.isNaN(parsed.getTime()) ? '' : localDateKey(parsed);
 };
+
+/**
+ * Status colours for the donut. These encode state, not series identity, so
+ * they stay fixed rather than following the categorical order.
+ *
+ * Validated against the dark chart surface (#0b1220): every step clears 3:1,
+ * and the worst adjacent pair separates by dE 9.4 under deuteranopia. The green
+ * is a teal rather than a leaf green specifically so "repaired" and "scrap" do
+ * not collapse into each other for red-green colourblind readers.
+ * Segment identity is never carried by colour alone - the legend labels and
+ * percentages sit beside every swatch.
+ */
+const STATUS_COLORS = {
+  new: '#5aa6ff',          // info - matches the product accent
+  in_progress: '#fbbf24',  // warning - work in flight
+  on_hold: '#8f9db3',      // neutral - deliberately desaturated for "paused"
+  repaired: '#2dd4bf',     // good
+  completed: '#2dd4bf',    // good
+  scrap: '#f87171'         // critical
+};
+
+const CHART_EMPTY_TRACK = '#1c2740';
+const CHART_FALLBACK = '#5aa6ff';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -61,8 +94,11 @@ const AdminDashboard = () => {
   }, []);
 
   const stats = useMemo(() => {
-    const openRequests = requests.filter((r) => isOpenStatus(r.status)).length;
-    const unassigned = requests.filter((r) => !r.assigned_to_user_id && !r.assigned_to_name).length;
+    const open = requests.filter((r) => isOpenStatus(r.status));
+    const openRequests = open.length;
+    // Scoped to open work: this figure is the sub-line of the "Open Requests"
+    // card, so counting repaired/scrapped rows here would overstate it.
+    const unassigned = open.filter((r) => !r.assigned_to_user_id && !r.assigned_to_name).length;
     const activeEquipment = equipment.filter((e) => String(e.status || '').toLowerCase() === 'active').length;
     const technicians = users.filter((u) => String(u.role || '').toLowerCase() === 'technician').length;
 
@@ -110,7 +146,7 @@ const AdminDashboard = () => {
       return {
         total: 0,
         segments: [],
-        gradient: 'conic-gradient(#334155 0deg 360deg)'
+        gradient: `conic-gradient(${CHART_EMPTY_TRACK} 0deg 360deg)`
       };
     }
 
@@ -124,7 +160,7 @@ const AdminDashboard = () => {
       return {
         ...item,
         pct,
-        color: STATUS_COLORS[item.status] || '#5aa6ff',
+        color: STATUS_COLORS[item.status] || CHART_FALLBACK,
         from,
         to
       };
@@ -166,21 +202,19 @@ const AdminDashboard = () => {
     }
 
     const countsMap = days.reduce((acc, d) => {
-      const key = d.toISOString().slice(0, 10);
-      acc[key] = 0;
+      acc[localDateKey(d)] = 0;
       return acc;
     }, {});
 
     for (const req of requests) {
-      if (!req.created_at) continue;
-      const key = new Date(req.created_at).toISOString().slice(0, 10);
-      if (Object.prototype.hasOwnProperty.call(countsMap, key)) {
+      const key = requestDateKey(req.created_at);
+      if (key && Object.prototype.hasOwnProperty.call(countsMap, key)) {
         countsMap[key] += 1;
       }
     }
 
     const series = days.map((d) => {
-      const key = d.toISOString().slice(0, 10);
+      const key = localDateKey(d);
       return {
         key,
         label: d.toLocaleDateString(undefined, { weekday: 'short' }),
@@ -318,9 +352,11 @@ const AdminDashboard = () => {
                     <stop offset="0%" stopColor="rgba(90,166,255,0.45)" />
                     <stop offset="100%" stopColor="rgba(90,166,255,0.02)" />
                   </linearGradient>
+                  {/* One series, so one hue. The previous blue-to-green ramp
+                      read as two different measures on a single line. */}
                   <linearGradient id="adminTrendLine" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#9fd1ff" />
-                    <stop offset="100%" stopColor="#4ccf95" />
+                    <stop offset="0%" stopColor="#5aa6ff" />
+                    <stop offset="100%" stopColor="#9fd1ff" />
                   </linearGradient>
                 </defs>
 

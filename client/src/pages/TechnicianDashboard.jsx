@@ -17,10 +17,10 @@ const TechnicianDashboard = () => {
     setError('');
     setLoading(true);
     try {
-      const { data } = await api.get('/maintenance');
-      // Filter to show only requests assigned to the technician
-      const technicianRequests = (data?.data || []).filter(r => 
-        r.assigned_to_user_id === user?.id || r.assigned_to_name
+      const { data } = await api.get('/maintenance', { params: { assigned_to: user?.id } });
+      // "My Tasks" means this technician's own work, never anyone else's.
+      const technicianRequests = (data?.data || []).filter(
+        (r) => Number(r.assigned_to_user_id) === Number(user?.id)
       );
       setRequests(technicianRequests);
     } catch (e) {
@@ -31,15 +31,21 @@ const TechnicianDashboard = () => {
   };
 
   useEffect(() => {
+    if (!user?.id) {
+      setRequests([]);
+      return;
+    }
     load();
   }, [user?.id]);
 
+  // Status keys as the API stores them: new -> in_progress -> repaired/scrap.
   const stats = useMemo(() => {
+    const statusOf = (r) => String(r.status || '').trim().toLowerCase();
     const total = requests.length;
-    const inProgress = requests.filter(r => String(r.status || '').toLowerCase() === 'in progress').length;
-    const completed = requests.filter(r => String(r.status || '').toLowerCase() === 'completed').length;
-    const pending = requests.filter(r => String(r.status || '').toLowerCase() === 'new').length;
-    
+    const inProgress = requests.filter((r) => statusOf(r) === 'in_progress').length;
+    const completed = requests.filter((r) => statusOf(r) === 'repaired').length;
+    const pending = requests.filter((r) => statusOf(r) === 'new').length;
+
     return { total, inProgress, completed, pending };
   }, [requests]);
 
@@ -140,8 +146,8 @@ const TechnicianDashboard = () => {
                   <td>{request.equipment_name || '-'}</td>
                   <td>{request.type}</td>
                   <td>
-                    <span className={`tech-status-badge tech-status-${String(request.status || '').toLowerCase().replace(' ', '-')}`}>
-                      {request.status}
+                    <span className={`tech-status-badge tech-status-${String(request.status || 'new').toLowerCase().replaceAll('_', '-')}`}>
+                      {String(request.status || 'new').replaceAll('_', ' ')}
                     </span>
                   </td>
                   <td>

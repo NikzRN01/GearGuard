@@ -107,8 +107,12 @@ export default function Requests() {
 	};
 
 	const loadRequestById = async (id) => {
-		const { data } = await api.get(`/maintenance/${id}`);
-		setActiveRequest(data?.data || null);
+		try {
+			const { data } = await api.get(`/maintenance/${id}`);
+			setActiveRequest(data?.data || null);
+		} catch (e) {
+			setError(e?.response?.data?.message || 'Failed to load the selected request');
+		}
 	};
 
 	useEffect(() => {
@@ -409,7 +413,7 @@ export default function Requests() {
 								className="table-row-click"
 								onClick={() => loadRequestById(r.id)}
 								title="Open request"
-								style={activeRequest?.id === r.id ? { outline: '2px solid rgba(90, 166, 255, 0.35)', outlineOffset: -2 } : undefined}
+								style={activeRequest?.id === r.id ? { outline: '2px solid var(--gg-color-border-accent)', outlineOffset: -2 } : undefined}
 							>
 								<td>{r.subject}</td>
 								<td>{r.status}</td>

@@ -115,17 +115,17 @@ const DashboardHome = () => {
       )}
 
       <div className="card-grid" style={{ marginBottom: 14 }}>
-        <div className="card" style={{ borderLeft: '3px solid rgba(239, 68, 68, 0.55)' }}>
+        <div className="card" style={{ borderLeft: '3px solid var(--gg-color-danger)' }}>
           <p className="muted">Critical Equipment</p>
           <h2>{criticalEquipmentCount} Units</h2>
         </div>
 
-        <div className="card" style={{ borderLeft: '3px solid rgba(90, 166, 255, 0.55)' }}>
+        <div className="card" style={{ borderLeft: '3px solid var(--gg-color-accent)' }}>
           <p className="muted">Technician Load</p>
           <h2>{technicianLoadPct}% Utilized</h2>
         </div>
 
-        <div className="card" style={{ borderLeft: '3px solid rgba(69, 209, 156, 0.55)' }}>
+        <div className="card" style={{ borderLeft: '3px solid var(--gg-color-success)' }}>
           <p className="muted">Open Requests</p>
           <h2>{openRequests.length} Pending</h2>
         </div>

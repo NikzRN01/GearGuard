@@ -3,9 +3,12 @@ const path = require('path');
 const bcrypt = require('bcrypt');
 
 // Initialize database
-const dbFilePath = process.env.VERCEL
-  ? path.join('/tmp', 'portal.db')
-  : path.join(__dirname, 'portal.db');
+// SQLITE_DB_PATH lets deployments (and the test suite) point at an alternate file.
+const dbFilePath = process.env.SQLITE_DB_PATH
+  ? path.resolve(process.env.SQLITE_DB_PATH)
+  : process.env.VERCEL
+    ? path.join('/tmp', 'portal.db')
+    : path.join(__dirname, 'portal.db');
 
 const db = new Database(dbFilePath);
 
@@ -28,6 +31,26 @@ const createUsersTable = () => {
   `;
   
   db.prepare(query).run();
+};
+
+// Create password_reset_tokens table.
+// Only the SHA-256 hash of a token is stored, so a database leak cannot be
+// replayed against the reset endpoint.
+const createPasswordResetTokensTable = () => {
+  const query = `
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at DATETIME NOT NULL,
+      used_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `;
+
+  db.prepare(query).run();
+  db.prepare('CREATE INDEX IF NOT EXISTS idx_reset_tokens_user ON password_reset_tokens(user_id)').run();
 };
 
 // Create teams table
@@ -276,6 +299,7 @@ const seedDemoData = () => {
 // Initialize all tables
 const initializeDatabase = () => {
   createUsersTable();
+  createPasswordResetTokensTable();
   createTeamsTable();
   createTeamMembersTable();
   createEquipmentTable();

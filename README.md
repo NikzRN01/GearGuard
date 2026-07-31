@@ -135,10 +135,16 @@ npm install
 
 **3. Configure Environment Variables**
 
-Create a `.env` file in the `server/` directory:
+Create a `.env` file in the `server/` directory (see `server/.env.example`):
 ```env
 # Server Configuration
 PORT=5000
+
+# Public URL of the frontend; used for password reset links and CORS
+APP_BASE_URL=http://localhost:5173
+
+# Browser origins allowed to call this API (comma separated)
+CORS_ALLOWED_ORIGINS=http://localhost:5173
 
 # Email Configuration (Gmail)
 SMTP_USER=your_email@gmail.com
@@ -146,6 +152,10 @@ SMTP_PASS=your_app_password
 ```
 
 > **Note**: For Gmail, generate an [App Password](https://support.google.com/accounts/answer/185833)
+>
+> **Deployment**: `CORS_ALLOWED_ORIGINS` must list your deployed frontend origin.
+> The built-in default only allows `http://localhost:5173`, so browser calls from
+> a deployed frontend will be blocked until you set it.
 
 **4. Start the Backend Server**
 ```bash
@@ -190,12 +200,19 @@ Base URL (local): `http://localhost:5000/api`
 
 - `POST /signup` – Create user
 - `POST /login` – Login (returns user info)
-- `POST /forget-password` – Sends reset link email
-- `POST /reset-password` – Resets password
+- `POST /forget-password` – Issues a single-use reset token and emails the link
+- `POST /reset-password` – Resets password (requires `email`, `token`, `newPassword`, `confirmPassword`)
 
 **Notes**
 - Password rules enforced on signup/reset: min 8 chars, at least 1 uppercase, 1 lowercase, 1 special character.
-- The forget-password email currently links to: `http://localhost:5173/reset-password?email=...`
+- `POST /reset-password` **requires the token** from the emailed link. Knowing an
+  email address is not sufficient to change a password.
+- Reset tokens are stored only as a SHA-256 hash, expire after 1 hour, are
+  single-use, and are invalidated when a newer one is issued.
+- The reset link is built from `APP_BASE_URL`: `${APP_BASE_URL}/reset-password?email=...&token=...`
+- `POST /login` returns **401** for both an unknown account and a wrong password,
+  and `POST /forget-password` always returns 200. Neither reveals whether an
+  email address is registered.
 
 ### Equipment (`/api/equipment`)
 
@@ -243,8 +260,26 @@ Base URL (local): `http://localhost:5000/api`
 
 ## Notes / Limitations
 
-- Authentication is currently **not token-based** (login returns user info only). If you need route protection, you can extend this with JWT/session handling.
+- **The API endpoints are unauthenticated.** Login returns user info only; there
+  is no token or session, and no route checks who the caller is. Role checks in
+  the React app are navigational convenience, not security — anyone who can
+  reach the API can read and modify every record. Add JWT/session handling plus
+  per-route authorization before exposing this to untrusted networks.
 - Email reset uses Gmail SMTP; you may need a Gmail **App Password** (recommended) instead of your account password.
+- SQLite is a single-file database. On Vercel it lives in `/tmp` and is wiped on
+  every cold start, so deployed data is not durable.
+
+---
+
+## Testing
+
+```bash
+cd server && npm test    # 135 API, schema, migration and hardening tests
+cd client && npm test    # 26 component and routing tests
+```
+
+The server suite runs against a throwaway SQLite file (`SQLITE_DB_PATH`) and a
+no-op mail transport, so it never touches `portal.db` or sends real email.
 
 ---
 

@@ -1,31 +1,11 @@
-.auth-layout,
-.auth-dialog-overlay {
-  --gg-color-surface: #fffef9;
-  --gg-color-surface-subtle: #f1f1e9;
-  --gg-color-border: #dcdcd2;
-  --gg-color-border-strong: #bcbcaf;
-  --gg-color-text: #23212c;
-  --gg-color-text-secondary: #575361;
-  --gg-color-text-muted: #6d6875;
-  --gg-color-primary: #23212c;
-  --gg-color-primary-hover: #373341;
-  --gg-color-primary-active: #17161d;
-  --gg-color-primary-soft: #f1fec8;
-  --gg-color-danger: #c73737;
-  --gg-color-danger-soft: #fdecec;
-  --gg-color-success: #16845b;
-  --gg-color-success-soft: #e7f6ef;
-  --gg-color-warning-soft: #fff3df;
-  --gg-color-focus: #68762d;
-  color-scheme: light;
-}
+/* The auth screens inherit the product theme from styles/tokens.css. */
 
 .auth-layout {
   min-height: 100vh;
   justify-content: center;
   padding: clamp(20px, 4vw, 48px);
   overflow: visible;
-  background: #f6f6f0;
+  background: var(--gg-color-page);
   color: var(--gg-color-text);
   font-family: var(--gg-font-sans);
 }
@@ -40,7 +20,7 @@
   border: 1px solid var(--gg-color-border);
   border-radius: 22px;
   background: var(--gg-color-surface);
-  box-shadow: 0 24px 70px rgba(35, 33, 44, 0.14);
+  box-shadow: var(--gg-shadow-lg);
   animation: gg-page-enter var(--gg-duration-slow) var(--gg-ease-emphasized) both;
 }
 
@@ -51,8 +31,8 @@
   justify-content: space-between;
   gap: var(--gg-space-8);
   padding: clamp(32px, 5vw, 58px);
-  background: #23212c;
-  color: #ffffff;
+  background: linear-gradient(160deg, var(--gg-navy-850), var(--gg-navy-950));
+  color: var(--gg-color-text);
 }
 
 .auth-brand-lockup {
@@ -67,18 +47,18 @@
   height: 42px;
   place-items: center;
   border-radius: var(--gg-radius-md);
-  background: #f1fec8;
-  color: #23212c;
+  background: var(--gg-color-primary);
+  color: var(--gg-color-primary-contrast);
   font-weight: 850;
 }
 
 .auth-brand-lockup > div { display: grid; gap: 2px; }
 .auth-brand-lockup strong { font-size: var(--gg-text-lg); }
-.auth-brand-lockup span:last-child { color: #b9b5c2; font-size: var(--gg-text-xs); }
+.auth-brand-lockup span:last-child { color: var(--gg-color-text-muted); font-size: var(--gg-text-xs); }
 
 .auth-brand-message > p {
   margin: 0 0 var(--gg-space-3);
-  color: #f1fec8;
+  color: var(--gg-color-accent);
   font-size: var(--gg-text-xs);
   font-weight: 800;
   letter-spacing: 0.09em;
@@ -88,7 +68,7 @@
 .auth-brand-message h2 {
   max-width: 430px;
   margin: 0;
-  color: #ffffff;
+  color: var(--gg-color-text);
   font-size: clamp(1.8rem, 3.5vw, 2.7rem);
   line-height: 1.08;
   letter-spacing: -0.035em;
@@ -98,7 +78,7 @@
   display: block;
   max-width: 420px;
   margin-top: var(--gg-space-5);
-  color: #c7c3ce;
+  color: var(--gg-color-text-secondary);
   line-height: 1.65;
 }
 
@@ -113,9 +93,9 @@
 
 .auth-product-points li {
   padding: 7px 10px;
-  border: 1px solid #4b4756;
-  border-radius: 999px;
-  color: #dedbe4;
+  border: 1px solid var(--gg-color-border-strong);
+  border-radius: var(--gg-radius-pill);
+  color: var(--gg-color-text-secondary);
   font-size: var(--gg-text-xs);
   font-weight: 650;
 }
@@ -173,7 +153,7 @@
   padding: 0 var(--gg-space-4);
   border: 1px solid var(--gg-color-border);
   border-radius: var(--gg-radius-md);
-  background: var(--gg-color-surface);
+  background: var(--gg-color-surface-subtle);
   color: var(--gg-color-text);
   font: inherit;
 }
@@ -185,8 +165,8 @@
 .auth-layout .input-select:focus,
 .auth-dialog .modal-input:focus {
   border-color: var(--gg-color-focus);
-  background: var(--gg-color-surface);
-  box-shadow: 0 0 0 3px rgba(104, 118, 45, 0.18);
+  background: var(--gg-color-surface-subtle);
+  box-shadow: 0 0 0 3px var(--gg-color-focus-ring);
   outline: 0;
 }
 
@@ -196,7 +176,7 @@
 
 .auth-layout .form-footer { justify-content: flex-end; }
 .auth-layout .link-btn,
-.auth-layout .link-secondary { color: var(--gg-color-primary); font-weight: 750; }
+.auth-layout .link-secondary { color: var(--gg-color-primary-text); font-weight: 750; }
 
 .auth-layout .gg-button { width: 100%; }
 
@@ -209,7 +189,7 @@
   text-align: center;
 }
 
-.auth-layout .auth-switch a { color: var(--gg-color-primary); font-weight: 800; }
+.auth-layout .auth-switch a { color: var(--gg-color-primary-text); font-weight: 800; }
 .auth-layout .auth-switch a:hover { color: var(--gg-color-primary-hover); text-decoration: underline; text-underline-offset: 3px; }
 
 .auth-layout .password-requirements {
@@ -239,13 +219,13 @@
   font-size: var(--gg-text-xs);
 }
 
-.auth-dialog-overlay { background: rgba(35, 33, 44, 0.62); }
+.auth-dialog-overlay { background: var(--gg-color-overlay); }
 .auth-dialog-overlay .auth-dialog {
   width: min(460px, 94vw);
   border: 1px solid var(--gg-color-border);
   background: var(--gg-color-surface);
   color: var(--gg-color-text);
-  box-shadow: 0 24px 70px rgba(35, 33, 44, 0.25);
+  box-shadow: var(--gg-shadow-lg);
 }
 .auth-dialog h3 { color: var(--gg-color-text); }
 .auth-dialog > p { color: var(--gg-color-text-secondary); }

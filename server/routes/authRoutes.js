@@ -1,9 +1,28 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const db = require('../database');
-const nodemailer = require("nodemailer");
+const nodemailer = require('nodemailer');
+const {
+  LIMITS,
+  badRequest,
+  unauthorized,
+  conflict,
+  forbidden,
+  requiredString,
+  optionalEnum,
+  route,
+  isUniqueViolation
+} = require('../lib/validation');
 
 const router = express.Router();
+
+const BCRYPT_ROUNDS = 10;
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour, matching the email copy.
+
+// A real bcrypt hash of a value nobody can submit, used to keep the cost of a
+// failed login identical whether or not the account exists.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), BCRYPT_ROUNDS);
 
 // Email validation regex
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -30,281 +49,276 @@ const validatePassword = (password) => {
 
   return errors;
 };
-// Email transporter configuration - Using Ethereal for testing (no setup required!)
-// Ethereal creates test accounts automatically and shows preview URLs
-// Email transporter configuration for Gmail
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
-// Sign Up Route
-router.post('/signup', async (req, res) => {
-  try {
-    const { name, email, password, reEnterPassword, role } = req.body;
 
-    // Validate required fields
-    if (!name || !email || !password || !reEnterPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'All fields are required'
-      });
+/** Validates a submitted password and returns it, or throws a 400. */
+const assertPasswordPolicy = (password, field) => {
+  const value = requiredString(password, field, LIMITS.password);
+  const errors = validatePassword(value);
+  if (errors.length > 0) throw badRequest(errors.join('. '));
+  return value;
+};
+
+// Case is preserved so accounts created before this validation existed keep
+// working; comparisons that need to be case-insensitive lower-case explicitly.
+const normalizeEmail = (value, field = 'Email') => {
+  const email = requiredString(value, field, LIMITS.email);
+  if (!emailRegex.test(email)) throw badRequest('Invalid email format');
+  return email;
+};
+
+/**
+ * Built lazily so a missing SMTP configuration cannot break module loading, and
+ * so tests can opt into a transport that never opens a network connection.
+ */
+let transporter;
+const getTransporter = () => {
+  if (transporter) return transporter;
+
+  const useJsonTransport =
+    process.env.MAIL_TRANSPORT === 'json' || !process.env.SMTP_USER || !process.env.SMTP_PASS;
+
+  if (useJsonTransport) {
+    if (process.env.NODE_ENV !== 'test') {
+      console.warn('SMTP is not configured; password reset emails will not be delivered.');
     }
-
-    // Validate role if provided
-    const validRoles = ['admin', 'manager', 'technician', 'user'];
-    if (role && !validRoles.includes(role)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid role. Must be: admin, manager, technician, or user'
-      });
-    }
-
-    // Validate email format
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid email format'
-      });
-    }
-
-    // Check if passwords match
-    if (password !== reEnterPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'Passwords do not match'
-      });
-    }
-
-    // Validate password strength
-    const passwordErrors = validatePassword(password);
-    if (passwordErrors.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: passwordErrors.join('. ')
-      });
-    }
-
-    // Check if user already exists
-    const existingUser = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-    if (existingUser) {
-      return res.status(409).json({
-        success: false,
-        message: 'Account already exists with this email'
-      });
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Insert new user
-    const stmt = db.prepare('INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)');
-    const result = stmt.run(name, email, hashedPassword, role || 'user');
-
-    res.status(201).json({
-      success: true,
-      message: 'User created successfully',
-      userId: result.lastInsertRowid
-    });
-
-  } catch (error) {
-    console.error('Signup error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
+    transporter = nodemailer.createTransport({ jsonTransport: true });
+  } else {
+    transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
     });
   }
-});
+  return transporter;
+};
+
+const appBaseUrl = () => (process.env.APP_BASE_URL || 'http://localhost:5173').replace(/\/+$/, '');
+
+const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+
+/** Escapes values interpolated into the HTML email body. */
+const escapeHtml = (value) =>
+  String(value).replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[char]));
+
+// Sign Up Route
+router.post('/signup', route(async (req, res) => {
+  const { name, email, password, reEnterPassword, role } = req.body || {};
+
+  // Validate required fields
+  if (!name || !email || !password || !reEnterPassword) {
+    throw badRequest('All fields are required');
+  }
+
+  const cleanName = requiredString(name, 'Name', LIMITS.name);
+  const cleanEmail = normalizeEmail(email);
+
+  // Validate role if provided
+  const validRoles = ['admin', 'manager', 'technician', 'user'];
+  const invalidRole = badRequest('Invalid role. Must be: admin, manager, technician, or user');
+  if (role !== undefined && role !== null && role !== '' && typeof role !== 'string') {
+    throw invalidRole;
+  }
+  const cleanRole = role ? String(role) : '';
+  if (cleanRole && !validRoles.includes(cleanRole)) throw invalidRole;
+
+  // Check if passwords match
+  if (password !== reEnterPassword) {
+    throw badRequest('Passwords do not match');
+  }
+
+  // Validate password strength
+  const cleanPassword = assertPasswordPolicy(password, 'Password');
+
+  // Check if user already exists
+  const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(cleanEmail);
+  if (existingUser) {
+    throw conflict('Account already exists with this email');
+  }
+
+  const hashedPassword = await bcrypt.hash(cleanPassword, BCRYPT_ROUNDS);
+
+  let result;
+  try {
+    result = db
+      .prepare('INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)')
+      .run(cleanName, cleanEmail, hashedPassword, cleanRole || 'user');
+  } catch (error) {
+    // Two concurrent signups can both pass the check above; the UNIQUE index
+    // is the real arbiter.
+    if (isUniqueViolation(error)) throw conflict('Account already exists with this email');
+    throw error;
+  }
+
+  res.status(201).json({
+    success: true,
+    message: 'User created successfully',
+    userId: result.lastInsertRowid
+  });
+}));
 
 // Login Route
-router.post('/login', async (req, res) => {
-  try {
-    const { email, password, role } = req.body;
+router.post('/login', route(async (req, res) => {
+  const { email, password, role } = req.body || {};
 
-    // Validate required fields
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email and password are required'
-      });
-    }
-
-    // Check if user exists
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'Account not found'
-      });
-    }
-
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid password'
-      });
-    }
-
-    // Check if user role matches the login role
-    if (role && user.role !== role) {
-      return res.status(403).json({
-        success: false,
-        message: `This account is registered as a ${user.role}, not a ${role}`
-      });
-    }
-
-    // Successful login - return user data (excluding password)
-    const { password: _, ...userWithoutPassword } = user;
-
-    res.status(200).json({
-      success: true,
-      message: 'Login successful',
-      user: userWithoutPassword
-    });
-
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+  // Validate required fields
+  if (!email || !password) {
+    throw badRequest('Email and password are required');
   }
-});
+  if (typeof email !== 'string' || typeof password !== 'string') {
+    throw badRequest('Email and password must be text');
+  }
+
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim());
+
+  // Compare against a throwaway hash when the account does not exist, so both
+  // the response time and the status code stay identical for unknown emails
+  // and wrong passwords.
+  const storedHash = user ? user.password : DUMMY_PASSWORD_HASH;
+  const isPasswordValid = await bcrypt.compare(password, storedHash);
+
+  if (!user || !isPasswordValid) {
+    throw unauthorized('Invalid email or password');
+  }
+
+  // Check if user role matches the login role
+  if (role && user.role !== role) {
+    throw forbidden(`This account is registered as a ${user.role}, not a ${role}`);
+  }
+
+  // Successful login - return user data (excluding password)
+  const { password: _, ...userWithoutPassword } = user;
+
+  res.status(200).json({
+    success: true,
+    message: 'Login successful',
+    user: userWithoutPassword
+  });
+}));
 
 // Forget Password Route
-router.post("/forget-password", async (req, res) => {
+router.post('/forget-password', route(async (req, res) => {
+  const { email } = req.body || {};
+
+  if (!email) {
+    throw badRequest('Email is required');
+  }
+  const cleanEmail = normalizeEmail(email);
+
+  const user = db.prepare('SELECT id, name, email FROM users WHERE email = ?').get(cleanEmail);
+
+  // Always answer identically, whether or not the account exists.
+  const genericResponse = {
+    success: true,
+    message: 'If an account exists for that address, a password reset email has been sent.'
+  };
+
+  if (!user) {
+    return res.status(200).json(genericResponse);
+  }
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS).toISOString();
+
+  const issue = db.transaction(() => {
+    // A new request supersedes any outstanding token for this account.
+    db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(user.id);
+    db.prepare(
+      'INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)'
+    ).run(user.id, hashToken(token), expiresAt);
+  });
+  issue();
+
+  const resetUrl = `${appBaseUrl()}/reset-password?email=${encodeURIComponent(user.email)}&token=${token}`;
+
   try {
-    const { email } = req.body;
-    
-    // Validate email
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email is required'
-      });
-    }
-    
-    // Check if user exists
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'Account not found'
-      });
-    }
-    
-    // Send email using nodemailer
-    const info = await transporter.sendMail({
-      from: '"GearGuard Team" <noreply@gearguard.com>', // sender address
-      to: email, // recipient
-      subject: "Reset your password for GearGuard", // subject line
-      text: "Hello, you requested to reset your password. Please click the link to reset your password.", // plain text body
+    await getTransporter().sendMail({
+      from: '"GearGuard Team" <noreply@gearguard.com>',
+      to: user.email,
+      subject: 'Reset your password for GearGuard',
+      text: `Hello ${user.name}, open this link to reset your GearGuard password: ${resetUrl} (valid for 1 hour).`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #333;">Password Reset Request</h2>
-          <p>Hello <strong>${user.name}</strong>,</p>
+          <p>Hello <strong>${escapeHtml(user.name)}</strong>,</p>
           <p>You requested to reset your password for your GearGuard account.</p>
           <p>Click the button below to reset your password:</p>
-          <a href="http://localhost:5173/reset-password?email=${email}" 
+          <a href="${escapeHtml(resetUrl)}"
              style="display: inline-block; padding: 12px 24px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0;">
             Reset Password
           </a>
           <p style="color: #666; font-size: 14px;">If you didn't request this, please ignore this email.</p>
           <p style="color: #666; font-size: 14px;">This link will expire in 1 hour.</p>
         </div>
-      `, // HTML body
+      `
     });
-
-    console.log("Message sent: %s", info.messageId);
-    // Preview URL is only available when using an Ethereal test account
-    if (nodemailer.getTestMessageUrl(info)) {
-      console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Password reset email sent successfully'
-    });
-    
   } catch (error) {
-    console.error('Forget password error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to send password reset email'
-    });
+    // Never let a mail outage disclose whether the address is registered.
+    console.error('Password reset email could not be sent:', error.message);
   }
-});
+
+  // Test builds surface the token so the flow can be exercised end to end.
+  // This must never happen outside NODE_ENV=test.
+  if (process.env.NODE_ENV === 'test') {
+    return res.status(200).json({ ...genericResponse, resetToken: token });
+  }
+
+  res.status(200).json(genericResponse);
+}));
 
 // Reset Password Route
-router.post("/reset-password", async (req, res) => {
-  try {
-    const { email, newPassword, confirmPassword } = req.body;
-    
-    // Validate required fields
-    if (!email || !newPassword || !confirmPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email, new password, and confirm password are required'
-      });
-    }
-    
-    // Validate email format
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid email format'
-      });
-    }
-    
-    // Check if passwords match
-    if (newPassword !== confirmPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'Passwords do not match'
-      });
-    }
-    
-    // Validate password strength
-    const passwordErrors = validatePassword(newPassword);
-    if (passwordErrors.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: passwordErrors.join('. ')
-      });
-    }
-    
-    // Check if user exists
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'Account not found'
-      });
-    }
-    
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    
-    // Update password in database
-    db.prepare('UPDATE users SET password = ? WHERE email = ?').run(hashedPassword, email);
-    
-    res.status(200).json({
-      success: true,
-      message: 'Password reset successfully'
-    });
-    
-  } catch (error) {
-    console.error('Reset password error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to reset password'
-    });
+router.post('/reset-password', route(async (req, res) => {
+  const { email, token, newPassword, confirmPassword } = req.body || {};
+
+  if (!email || !newPassword || !confirmPassword) {
+    throw badRequest('Email, new password, and confirm password are required');
   }
-});
+
+  const cleanEmail = normalizeEmail(email);
+
+  if (newPassword !== confirmPassword) {
+    throw badRequest('Passwords do not match');
+  }
+
+  const cleanPassword = assertPasswordPolicy(newPassword, 'Password');
+
+  // Possession of the emailed token is the only proof of ownership.
+  const cleanToken = requiredString(token, 'Reset token', 200);
+  const invalidToken = badRequest('This password reset link is invalid or has expired');
+
+  const record = db.prepare(`
+    SELECT prt.id, prt.user_id, prt.expires_at, prt.used_at, u.email
+    FROM password_reset_tokens prt
+    JOIN users u ON u.id = prt.user_id
+    WHERE prt.token_hash = ?
+  `).get(hashToken(cleanToken));
+
+  if (!record || record.used_at) throw invalidToken;
+  if (record.email.toLowerCase() !== cleanEmail.toLowerCase()) throw invalidToken;
+  if (Date.parse(record.expires_at) <= Date.now()) throw invalidToken;
+
+  const hashedPassword = await bcrypt.hash(cleanPassword, BCRYPT_ROUNDS);
+
+  const apply = db.transaction(() => {
+    // Re-check inside the transaction so two concurrent resets cannot both win.
+    const claimed = db.prepare(
+      'UPDATE password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE id = ? AND used_at IS NULL'
+    ).run(record.id);
+    if (claimed.changes !== 1) return false;
+
+    db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashedPassword, record.user_id);
+    // Any other outstanding token for this account is now void.
+    db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ? AND id != ?')
+      .run(record.user_id, record.id);
+    return true;
+  });
+
+  if (!apply()) throw invalidToken;
+
+  res.status(200).json({
+    success: true,
+    message: 'Password reset successfully'
+  });
+}));
 
 module.exports = router;
-

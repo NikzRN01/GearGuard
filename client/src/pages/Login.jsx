@@ -38,9 +38,9 @@ export default function Login() {
       if (err?.code === 'ERR_NETWORK') {
         setError('Unable to connect to server. Please check your connection.');
       } else if (err?.response?.status === 401) {
+        // The API deliberately does not distinguish an unknown account from a
+        // wrong password, so neither does this message.
         setError('Invalid email or password. Please try again.');
-      } else if (err?.response?.status === 404) {
-        setError('Account not found. Please sign up first.');
       } else {
         setError(err?.response?.data?.message || 'Login failed. Please try again.');
       }
@@ -58,7 +58,9 @@ export default function Login() {
     try {
       const { data } = await api.post('/auth/forget-password', { email: forgotEmail });
       if (data?.success) {
-        setForgotSuccess('Password reset email sent! Please check your inbox.');
+        // The API answers identically whether or not the address is registered,
+        // so this confirmation must stay non-committal too.
+        setForgotSuccess('If an account exists for that address, a reset link is on its way.');
         setTimeout(() => {
           setShowForgotPassword(false);
           setForgotEmail('');
@@ -70,8 +72,6 @@ export default function Login() {
     } catch (err) {
       if (err?.code === 'ERR_NETWORK') {
         setForgotError('Unable to connect to server. Please check your connection.');
-      } else if (err?.response?.status === 404) {
-        setForgotError('No account found with this email address.');
       } else {
         setForgotError(err?.response?.data?.message || 'Failed to send reset email. Please try again.');
       }

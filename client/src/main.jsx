@@ -48,7 +48,7 @@ root.render(
           <Route path="manager/requests/:requestId" element={<RoleRoute allowedRoles={['manager']}><ManagerRequests /></RoleRoute>} />
           <Route path="manager/schedule" element={<RoleRoute allowedRoles={['manager']}><Calendar /></RoleRoute>} />
           <Route path="manager/workload" element={<RoleRoute allowedRoles={['manager']}><ManagerWorkload /></RoleRoute>} />
-          <Route path="technician" element={<TechnicianDashboard />} />
+          <Route path="technician" element={<RoleRoute allowedRoles={['technician', 'manager', 'admin']}><TechnicianDashboard /></RoleRoute>} />
           <Route path="calendar" element={<Calendar />} />
           <Route path="equipment/work-center" element={<WorkCenter />} />
           <Route path="equipment/machine-tools" element={<MachineTools />} />
