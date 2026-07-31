@@ -5,7 +5,7 @@
 ### Intelligent Maintenance Management System
 
 [![Live Demo](https://img.shields.io/badge/demo-live-success?style=for-the-badge)](https://gearguardodoo.vercel.app)
-[![Node.js](https://img.shields.io/badge/Node.js-20.x-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-22_LTS-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
 [![License](https://img.shields.io/badge/license-ISC-blue?style=for-the-badge)](LICENSE)
 
@@ -98,17 +98,17 @@
 
 ### Frontend
 - **React** 18.3.1 - UI Framework
-- **Vite** 5.0.10 - Build Tool & Dev Server
-- **React Router** 6.28.0 - Client-side Routing
-- **Axios** 1.7.7 - HTTP Client
+- **Vite** 8.2.x - Build Tool & Dev Server
+- **React Router** 7.18.x - Client-side Routing
+- **Axios** 1.19.x - HTTP Client
 
 ### Backend
-- **Node.js** 20.x - Runtime Environment
-- **Express** 4.18.2 - Web Framework
-- **SQLite** (better-sqlite3 9.2.2) - Database
-- **bcrypt** 5.1.1 - Password Hashing
-- **nodemailer** 6.9.7 - Email Service
-- **dotenv** 16.6.1 - Environment Variables
+- **Node.js** 22 LTS (22.12 or newer) - Runtime Environment
+- **Express** 4.22.x - Web Framework
+- **SQLite** (better-sqlite3 12.x) - Local/demo Database
+- **bcrypt** 6.x - Password Hashing
+- **nodemailer** 9.x - Email Service
+- **dotenv** 17.x - Environment Variables
 
 ---
 
@@ -116,7 +116,7 @@
 
 ### Prerequisites
 
-- **Node.js** 18.x or higher ([Download](https://nodejs.org/))
+- **Node.js** 22 LTS, version 22.12 or newer ([Download](https://nodejs.org/))
 - **npm** (comes with Node.js)
 
 ### Installation

@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../services/api';
+import Alert from '../components/ui/Alert';
+import Button from '../components/ui/Button';
+import EmptyState from '../components/ui/EmptyState';
+import PageHeader from '../components/ui/PageHeader';
+import Panel from '../components/ui/Panel';
 
 export default function WorkCenter() {
     const [rows, setRows] = useState([]);
@@ -142,71 +147,55 @@ export default function WorkCenter() {
     };
 
     return (
-        <div className="container">
-            <div className="page-header">
-                <div>
-                    <h1>Work Center</h1>
-                    <p className="muted">Work center list view</p>
-                </div>
-                <div className="page-actions">
-                    <button type="button" className="btn-accent" onClick={openNew}>
-                        New
-                    </button>
-                    <button type="button" className="btn-secondary" onClick={load} disabled={loading}>
-                        {loading ? 'Refreshing…' : 'Refresh'}
-                    </button>
-                </div>
-            </div>
+        <div className="container manager-page manager-workcenter-page">
+            <PageHeader eyebrow="Manager workspace" title="Work centers" description="Manage operational work centers, capacity settings, and alternatives." actions={<><Button onClick={openNew}>Add work center</Button><Button variant="secondary" onClick={load} disabled={loading}>{loading ? 'Refreshing...' : 'Refresh'}</Button></>} />
 
-            {error && <div className="alert alert-error animate-shake" style={{ marginBottom: 12 }}>{error}</div>}
+            {error && <Alert tone="danger" title="Work centers could not be loaded" action={<Button variant="secondary" size="small" onClick={load}>Try again</Button>}>{error}</Alert>}
 
-            <div className="table-wrap">
-                <table className="table">
+            {!error && <Panel eyebrow="Operations" title={`${rows.length} work centers`} ariaLabel="Work centers">
+                {loading ? <div className="manager-state" role="status">Loading work centers...</div> : rows.length === 0 ? <EmptyState title="No work centers yet" description="Create the first work center to make it available in maintenance workflows." action={<Button onClick={openNew}>Add work center</Button>} /> : <div className="table-wrap">
+                <table className="table manager-workcenter-table">
                     <thead>
                         <tr>
                             <th>Work Center</th>
                             <th>Code</th>
                             <th>Tag</th>
                             <th>Alternative Workcenters</th>
-                            <th style={{ textAlign: 'right' }}>Cost per hour</th>
-                            <th style={{ textAlign: 'right' }}>Capacity</th>
-                            <th style={{ textAlign: 'right' }}>Time Efficiency</th>
-                            <th style={{ textAlign: 'right' }}>OEE Target</th>
+                            <th className="manager-number-cell">Cost per hour</th>
+                            <th className="manager-number-cell">Capacity</th>
+                            <th className="manager-number-cell">Time efficiency</th>
+                            <th className="manager-number-cell">OEE target</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {!loading && rows.length === 0 && (
-                            <tr>
-                                <td colSpan={8} className="table-empty">No work centers yet.</td>
-                            </tr>
-                        )}
                         {rows.map((wc) => (
                             <tr key={wc.id}>
-                                <td>{wc.name}</td>
-                                <td>{wc.code || '-'}</td>
-                                <td>{wc.tag || '-'}</td>
-                                <td className="muted">
+                                <th scope="row" data-label="Work center">{wc.name}</th>
+                                <td data-label="Code">{wc.code || '-'}</td>
+                                <td data-label="Tag">{wc.tag || '-'}</td>
+                                <td data-label="Alternative work centers">
                                     {(altMap[wc.id] || []).length
                                         ? (altMap[wc.id] || []).map((a) => a.alt_name).join(', ')
                                         : '-'}
                                 </td>
-                                <td style={{ textAlign: 'right' }}>{Number(wc.cost_per_hour ?? 0).toFixed(2)}</td>
-                                <td style={{ textAlign: 'right' }}>{Number(wc.capacity_per_hour ?? 0).toFixed(2)}</td>
-                                <td style={{ textAlign: 'right' }}>{Number(wc.time_efficiency_pct ?? 100).toFixed(2)}</td>
-                                <td style={{ textAlign: 'right' }}>{Number(wc.oee_target_pct ?? 0).toFixed(2)}</td>
+                                <td data-label="Cost per hour" className="manager-number-cell">{Number(wc.cost_per_hour ?? 0).toFixed(2)}</td>
+                                <td data-label="Capacity" className="manager-number-cell">{Number(wc.capacity_per_hour ?? 0).toFixed(2)}</td>
+                                <td data-label="Time efficiency" className="manager-number-cell">{Number(wc.time_efficiency_pct ?? 100).toFixed(2)}%</td>
+                                <td data-label="OEE target" className="manager-number-cell">{Number(wc.oee_target_pct ?? 0).toFixed(2)}%</td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
-            </div>
+            </div>}
+            </Panel>}
 
             {showNew &&
                 typeof document !== 'undefined' &&
                 createPortal(
-                    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Create work center">
-                        <div className="modal-content" style={{ maxWidth: 520 }}>
+                    <div className="modal-overlay manager-workcenter-overlay" role="dialog" aria-modal="true" aria-label="Create work center">
+                        <div className="modal-content manager-workcenter-modal">
                             <h3>Create Work Center</h3>
-                            <p>Must create a work center proper form view with respective fields used in maintenance requests.</p>
+                            <p>Add the operational values used when planning and assigning maintenance work.</p>
                             <form onSubmit={submitNew}>
                                 <div className="input-group">
                                     <label>Work Center Name</label>
@@ -218,7 +207,7 @@ export default function WorkCenter() {
                                     />
                                 </div>
 
-                                <div className="signup-grid" style={{ marginTop: 12 }}>
+                                <div className="signup-grid">
                                     <div className="input-group">
                                         <label>Code</label>
                                         <input
@@ -239,7 +228,7 @@ export default function WorkCenter() {
                                     </div>
                                 </div>
 
-                                <div className="signup-grid" style={{ marginTop: 12 }}>
+                                <div className="signup-grid">
                                     <div className="input-group">
                                         <label>Cost per hour</label>
                                         <input
@@ -264,7 +253,7 @@ export default function WorkCenter() {
                                     </div>
                                 </div>
 
-                                <div className="signup-grid" style={{ marginTop: 12 }}>
+                                <div className="signup-grid">
                                     <div className="input-group">
                                         <label>Time Efficiency (%)</label>
                                         <input
@@ -291,47 +280,35 @@ export default function WorkCenter() {
                                     </div>
                                 </div>
 
-                                <div className="input-group" style={{ marginTop: 12 }}>
+                                <div className="input-group">
                                     <label>Alternative Workcenters</label>
-                                    <select
-                                        className="modal-input"
-                                        multiple
-                                        value={form.alternative_ids}
-                                        onChange={(e) => {
-                                            const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
-                                            updateForm('alternative_ids', selected);
-                                        }}
-                                        style={{ height: 120, paddingTop: 10, paddingBottom: 10 }}
-                                    >
-                                        {rows.map((wc) => (
-                                            <option key={wc.id} value={String(wc.id)}>
-                                                {wc.name}{wc.code ? ` (${wc.code})` : ''}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    {rows.length === 0 ? <p className="manager-field-hint">No existing work centers are available as alternatives.</p> : <select
+                                            className="modal-input manager-multi-select"
+                                            multiple
+                                            value={form.alternative_ids}
+                                            onChange={(e) => {
+                                                const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
+                                                updateForm('alternative_ids', selected);
+                                            }}
+                                        >
+                                            {rows.map((wc) => (
+                                                <option key={wc.id} value={String(wc.id)}>
+                                                    {wc.name}{wc.code ? ` (${wc.code})` : ''}
+                                                </option>
+                                            ))}
+                                        </select>}
                                 </div>
 
                                 {formError && (
-                                    <div
-                                        className="alert alert-error animate-shake"
-                                        style={{ marginTop: 12, whiteSpace: 'pre-line' }}
-                                    >
-                                        {formError}
-                                    </div>
+                                    <Alert tone="danger" title="Check the form"><span className="manager-pre-line">{formError}</span></Alert>
                                 )}
                                 {formSuccess && (
-                                    <div className="alert alert-success" style={{ marginTop: 12 }}>
-                                        {formSuccess}
-                                    </div>
+                                    <Alert tone="success">{formSuccess}</Alert>
                                 )}
 
-                                <div className="modal-actions" style={{ marginTop: 16 }}>
-                                    <button type="button" className="btn-secondary" onClick={closeNew} disabled={saving}>
-                                        Cancel
-                                    </button>
-                                    <button type="submit" className="btn-accent" disabled={saving}>
-                                        {saving && <span className="spinner" />} Create
-                                    </button>
+                                <div className="modal-actions manager-workcenter-modal-actions">
+                                    <Button type="button" variant="secondary" onClick={closeNew} disabled={saving}>Cancel</Button>
+                                    <Button type="submit" pending={saving} pendingLabel="Creating...">Create work center</Button>
                                 </div>
                             </form>
                         </div>

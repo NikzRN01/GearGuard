@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import AuthCard from '../shared/AuthCard';
+import Alert from '../components/ui/Alert';
+import Button from '../components/ui/Button';
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -34,6 +36,7 @@ export default function Signup() {
     number: /\d/.test(password),
     special: /[^\w]/.test(password)
   }), [password]);
+  const passwordIsValid = Object.values(passwordRequirements).every(Boolean);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -47,6 +50,10 @@ export default function Signup() {
     }
     if (password !== reEnterPassword) {
       setError('Passwords do not match');
+      return;
+    }
+    if (!passwordIsValid) {
+      setError('Password must meet all five requirements.');
       return;
     }
 
@@ -84,14 +91,12 @@ export default function Signup() {
     }
   };
 
-  const cardClass = error ? 'animate-shake' : success ? 'animate-success' : '';
   const passwordsMatch = reEnterPassword && password === reEnterPassword;
 
   return (
     <AuthCard 
-      title="Create Account" 
-      subtitle="Join your team"
-      className={cardClass}
+      title="Create account" 
+      subtitle="Create an account for your maintenance workspace."
     >
       <form onSubmit={onSubmit} className="auth-form">
         <div className="input-group">
@@ -104,8 +109,6 @@ export default function Signup() {
           >
             <option value="user">User</option>
             <option value="technician">Technician</option>
-            <option value="manager">Manager</option>
-            <option value="admin">Admin</option>
           </select>
         </div>
 
@@ -147,7 +150,7 @@ export default function Signup() {
               onChange={(e) => setPassword(e.target.value)} 
               placeholder="Create a strong password"
               autoComplete="new-password"
-              minLength="8"
+              minLength="10"
               required 
             />
             <button 
@@ -261,10 +264,10 @@ export default function Signup() {
           )}
         </div>
 
-        {error && <div className="alert alert-error" role="alert">{error}</div>}
+        {error && <Alert tone="danger" title="Account could not be created">{error}</Alert>}
         {success && (
-          <div className="alert alert-success" role="alert">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <Alert tone="success">
+            <div className="auth-success-row">
               <span>{success} {countdown !== null && `Redirecting in ${countdown}...`}</span>
               {countdown !== null && (
                 <button 
@@ -272,20 +275,14 @@ export default function Signup() {
                   className="link-secondary" 
                   onClick={() => navigate('/login')}
                 >
-                  Skip →
+                  Continue now →
                 </button>
               )}
             </div>
-          </div>
+          </Alert>
         )}
 
-        <button type="submit" disabled={loading || !passwordsMatch} className="btn-primary">
-          {loading ? (
-            <><span className="spinner" /> Creating account...</>
-          ) : (
-            'Create Account'
-          )}
-        </button>
+        <Button type="submit" pending={loading} pendingLabel="Creating account..." disabled={!passwordsMatch || !passwordIsValid}>Create account</Button>
       </form>
     </AuthCard>
   );

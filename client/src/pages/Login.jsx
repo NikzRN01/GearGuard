@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import AuthCard from '../shared/AuthCard';
+import { getDefaultAppPath } from '../services/session';
+import Alert from '../components/ui/Alert';
+import Button from '../components/ui/Button';
+import Field from '../components/ui/Field';
+import Input from '../components/ui/Input';
 
 export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [userType, setUserType] = useState('user');
   const [showPassword, setShowPassword] = useState(false);
-  const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -23,17 +26,11 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      const { data } = await api.post('/auth/login', { email, password, role: userType });
+      const { data } = await api.post('/auth/login', { email, password });
       if (data?.success) {
         // store minimal user session for demo
         sessionStorage.setItem('user', JSON.stringify(data.user));
-        const role = data?.user?.role;
-        const destination = role === 'technician'
-          ? '/app/technician'
-          : (role === 'admin' || role === 'manager')
-            ? '/app/admin'
-            : '/app';
-        navigate(destination);
+        navigate(getDefaultAppPath(data.user));
       } else {
         setError(data?.message || 'Login failed');
       }
@@ -83,31 +80,13 @@ export default function Login() {
     }
   };
 
-  const cardClass = error ? 'animate-shake' : '';
-
   return (
     <>
       <AuthCard 
-        title="Welcome Back" 
-        subtitle="Sign in to manage equipment and track maintenance"
-        className={cardClass}
+        title="Welcome back" 
+        subtitle="Sign in to review equipment, requests, schedules, and assigned work."
       >
         <form onSubmit={onSubmit} className="auth-form">
-        <div className="input-group">
-          <label htmlFor="userType">Login As</label>
-          <select
-            id="userType"
-            value={userType}
-            onChange={(e) => setUserType(e.target.value)}
-            className="input-select"
-          >
-            <option value="user">User</option>
-            <option value="technician">Technician</option>
-            <option value="manager">Manager</option>
-            <option value="admin">Admin</option>
-          </select>
-        </div>
-
         <div className="input-group">
           <label htmlFor="email">Email Address</label>
           <input 
@@ -154,17 +133,9 @@ export default function Login() {
           </div>
         </div>
 
-        {error && <div className="alert alert-error" role="alert">{error}</div>}
+        {error && <Alert tone="danger" title="Sign in failed">{error}</Alert>}
 
         <div className="form-footer">
-          <label className="checkbox">
-            <input 
-              type="checkbox" 
-              checked={remember} 
-              onChange={(e) => setRemember(e.target.checked)} 
-            />
-            Remember me
-          </label>
           <button 
             type="button" 
             className="link-btn" 
@@ -174,45 +145,39 @@ export default function Login() {
           </button>
         </div>
 
-        <button type="submit" disabled={loading} className="btn-primary">
-          {loading ? (
-            <><span className="spinner" /> Signing in...</>
-          ) : (
-            'Sign In'
-          )}
-        </button>
+        <Button type="submit" pending={loading} pendingLabel="Signing in...">Sign in</Button>
         </form>
       </AuthCard>
 
       {showForgotPassword && (
-        <div className="modal-overlay" onClick={() => {
+        <div className="modal-overlay auth-dialog-overlay" onClick={() => {
           setShowForgotPassword(false);
           setForgotEmail('');
           setForgotError('');
           setForgotSuccess('');
         }}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>Reset Password</h3>
+          <div className="modal-content auth-dialog" role="dialog" aria-modal="true" aria-labelledby="reset-password-title" onClick={(e) => e.stopPropagation()}>
+            <h3 id="reset-password-title">Reset password</h3>
             <p>Enter your email address and we'll send you a link to reset your password.</p>
             
             <form onSubmit={handleForgotPassword}>
-              <input 
-                type="email" 
-                placeholder="you@company.com" 
-                className="modal-input" 
+              <Field label="Account email" required><Input
+                type="email"
+                placeholder="you@company.com"
+                className="modal-input"
                 value={forgotEmail}
                 onChange={(e) => setForgotEmail(e.target.value)}
-                required
                 disabled={forgotLoading}
-              />
+                autoComplete="email"
+              /></Field>
               
-              {forgotError && <div className="alert alert-error" style={{marginTop: '10px'}}>{forgotError}</div>}
-              {forgotSuccess && <div className="alert alert-success" style={{marginTop: '10px'}}>{forgotSuccess}</div>}
+              {forgotError && <Alert tone="danger">{forgotError}</Alert>}
+              {forgotSuccess && <Alert tone="success">{forgotSuccess}</Alert>}
               
               <div className="modal-actions">
-                <button 
+                <Button 
                   type="button"
-                  className="btn-secondary" 
+                  variant="secondary"
                   onClick={() => {
                     setShowForgotPassword(false);
                     setForgotEmail('');
@@ -220,20 +185,13 @@ export default function Login() {
                     setForgotSuccess('');
                   }}
                   disabled={forgotLoading}
-                >
-                  Cancel
-                </button>
-                <button 
+                >Cancel</Button>
+                <Button 
                   type="submit" 
-                  className="btn-accent"
-                  disabled={forgotLoading || !forgotEmail}
-                >
-                  {forgotLoading ? (
-                    <><span className="spinner" /> Sending...</>
-                  ) : (
-                    'Send Reset Link'
-                  )}
-                </button>
+                  pending={forgotLoading}
+                  pendingLabel="Sending..."
+                  disabled={!forgotEmail}
+                >Send reset link</Button>
               </div>
             </form>
           </div>

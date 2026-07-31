@@ -7,33 +7,42 @@ export default function AuthCard({ title, subtitle, children, className }) {
 
   return (
     <div className="auth-layout">
-      <div className="auth-backdrop" aria-hidden="true">
-        <span className="orb orb-a" />
-        <span className="orb orb-b" />
-        <span className="orb orb-c" />
-      </div>
+      <main className="auth-shell">
+        <section className="auth-brand-panel" aria-label="GearGuard product information">
+          <div className="auth-brand-lockup">
+            <span className="auth-brand-mark" aria-hidden="true">G</span>
+            <div><strong>GearGuard</strong><span>Maintenance operations</span></div>
+          </div>
+          <div className="auth-brand-message">
+            <p>Operational maintenance workspace</p>
+            <h2>Keep work visible, assigned, and moving.</h2>
+            <span>Coordinate requests, equipment, schedules, and maintenance teams from one focused workspace.</span>
+          </div>
+          <ul className="auth-product-points">
+            <li>Clear ownership</li><li>Schedule visibility</li><li>Operational history</li>
+          </ul>
+        </section>
 
-      <div className={`auth-card ${className || ''}`}>
-        <div className="card-header">
-          <div className="brand">GearGuard</div>
-          <h1>{title}</h1>
-          {subtitle && <p className="card-subtitle">{subtitle}</p>}
-        </div>
+        <section className={`auth-card ${className || ''}`}>
+          <div className="card-header">
+            <p className="auth-eyebrow">{isLogin ? 'Welcome back' : 'Get started'}</p>
+            <h1>{title}</h1>
+            {subtitle && <p className="card-subtitle">{subtitle}</p>}
+          </div>
 
-        <div className="auth-switch">
-          {isLogin ? (
-            <>Don't have an account? <Link to="/signup">Sign up</Link></>
-          ) : (
-            <>Already have an account? <Link to="/login">Sign in</Link></>
-          )}
-        </div>
+          {children}
 
-        {children}
-      </div>
+          <div className="auth-switch">
+            {isLogin ? (
+              <>New to GearGuard? <Link to="/signup">Create an account</Link></>
+            ) : (
+              <>Already have an account? <Link to="/login">Sign in</Link></>
+            )}
+          </div>
+        </section>
+      </main>
 
-      <p className="caption">
-        Secure equipment management for operations teams.
-      </p>
+      <p className="caption">Secure equipment management for operations teams.</p>
     </div>
   );
 }

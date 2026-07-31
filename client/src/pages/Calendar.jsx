@@ -1,5 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../services/api';
+import Alert from '../components/ui/Alert';
+import Button from '../components/ui/Button';
+import EmptyState from '../components/ui/EmptyState';
+import PageHeader from '../components/ui/PageHeader';
 
 export default function Calendar() {
 	const [currentDate, setCurrentDate] = useState(new Date());
@@ -111,6 +115,13 @@ export default function Calendar() {
 	const monthDays = getMonthDays();
 	const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 	const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+	const getWeekNumber = (date) => {
+		const target = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+		const dayNumber = target.getUTCDay() || 7;
+		target.setUTCDate(target.getUTCDate() + 4 - dayNumber);
+		const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
+		return Math.ceil((((target - yearStart) / 86400000) + 1) / 7);
+	};
 
 	const goToToday = () => setCurrentDate(new Date());
 	const goToPrevious = () => {
@@ -176,42 +187,48 @@ export default function Calendar() {
 			})
 			.filter(Boolean);
 	}, [scheduledRequests]);
+	const visibleEvents = events.filter((event) => weekDays.some((day) =>
+		event.date.getDate() === day.getDate() &&
+		event.date.getMonth() === day.getMonth() &&
+		event.date.getFullYear() === day.getFullYear()
+	));
 
 	return (
-		<div className="container">
-			<div className="calendar-header">
-				<h1>Maintenance Calendar</h1>
-				<div className="calendar-controls">
-					<button className="calendar-nav-btn" onClick={goToPrevious}>←</button>
-					<button className="calendar-nav-btn" onClick={goToToday}>Today</button>
-					<button className="calendar-nav-btn" onClick={goToNext}>→</button>
+		<div className="container manager-page manager-schedule-page">
+			<PageHeader
+				eyebrow="Manager workspace"
+				title="Maintenance schedule"
+				description="Review scheduled maintenance work by date."
+				actions={<div className="calendar-controls" aria-label="Schedule navigation">
+					<Button variant="secondary" aria-label="Previous week" onClick={goToPrevious}>←</Button>
+					<Button variant="secondary" onClick={goToToday}>Today</Button>
+					<Button variant="secondary" aria-label="Next week" onClick={goToNext}>→</Button>
 					<select 
 						className="calendar-view-select"
 						value={view}
 						onChange={(e) => setView(e.target.value)}
+						aria-label="Schedule view"
 					>
 						<option value="week">Week</option>
-						<option value="month">Month</option>
 					</select>
-				</div>
-			</div>
+				</div>}
+			/>
 
 			{error && (
-				<div className="alert alert-error" style={{ marginBottom: 12 }}>
-					{error}
-				</div>
+				<Alert tone="danger" title="Schedule could not be loaded">{error}</Alert>
 			)}
+			{loading && <div className="manager-state" role="status">Loading maintenance schedule...</div>}
 
-			<div className="calendar-content">
+			{!loading && !error && <div className="calendar-content">
 				<div className="calendar-main">
 					<div className="calendar-week-info">
 						<span className="calendar-month-year">
 							{monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
 						</span>
-						<span className="calendar-week-number">Week 51</span>
+						<span className="calendar-week-number">Week {getWeekNumber(currentDate)}</span>
 					</div>
 
-					<div className="calendar-grid">
+					{visibleEvents.length === 0 ? <EmptyState title="No work scheduled this week" description="Use the week controls to review another period. Scheduled requests will appear here." /> : <div className="calendar-grid">
 						<div className="calendar-time-column">
 							{timeSlots.map((time) => (
 								<div key={time} className="time-slot">{time}</div>
@@ -256,7 +273,7 @@ export default function Calendar() {
 								))}
 							</div>
 						</div>
-					</div>
+					</div>}
 				</div>
 
 				<div className="calendar-mini">
@@ -276,17 +293,23 @@ export default function Calendar() {
 						</div>
 						<div className="mini-days">
 							{monthDays.map((day, idx) => (
-								<div 
+								<button
+									type="button"
 									key={idx} 
 									className={`mini-day ${day ? '' : 'empty'} ${day && isToday(day) ? 'today' : ''} ${day && day.getDate() === currentDate.getDate() ? 'selected' : ''}`}
+									disabled={!day}
+									onClick={() => day && setCurrentDate(day)}
+									aria-label={day ? day.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : undefined}
+									aria-current={day && isToday(day) ? 'date' : undefined}
+									aria-pressed={day ? day.getDate() === currentDate.getDate() : undefined}
 								>
 									{day ? day.getDate() : ''}
-								</div>
+								</button>
 							))}
 						</div>
 					</div>
 				</div>
-			</div>
+			</div>}
 		</div>
 	);
 }
