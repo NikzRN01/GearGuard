@@ -324,6 +324,13 @@ const seedDemoData = () => {
       .run('GearGuard Admin', 'admin@demo.com', demoPasswordHash, 'admin');
   }
 
+  const demoUser = db.prepare('SELECT id FROM users WHERE email = ?').get('user@demo.com');
+  if (!demoUser) {
+    demoPasswordHash ||= bcrypt.hashSync('Password123!', 10);
+    db.prepare('INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)')
+      .run('GearGuard User', 'user@demo.com', demoPasswordHash, 'user');
+  }
+
   const equipmentCount = db.prepare('SELECT COUNT(1) as c FROM equipment').get()?.c || 0;
   if (equipmentCount === 0) {
     const insertEq = db.prepare(`

@@ -321,12 +321,12 @@ export default function Requests() {
 	};
 
 	return (
-		<div className={`container ${user?.role === 'technician' ? 'technician-requests-page' : ''}`}>
+		<div className={`container ${['technician', 'user'].includes(user?.role) ? 'technician-requests-page' : ''} ${user?.role === 'user' ? 'user-requests-page' : ''}`}>
 			<div className="page-header">
 				<div>
 					<h1>Requests</h1>
 					<p className="muted">
-						Submit, triage, and track maintenance work.
+						{user?.role === 'user' ? 'Submit and track your maintenance requests.' : 'Submit, triage, and track maintenance work.'}
 						{scope.equipment_id && <> {' '}• Showing equipment #{scope.equipment_id}</>}
 						{scope.work_center_id && <> {' '}• Showing work center #{scope.work_center_id}</>}
 					</p>
@@ -342,7 +342,7 @@ export default function Requests() {
 			{/* Top action bar with status timeline */}
 			<div className="request-top-bar">
 				<button className="btn-new" type="button" onClick={openNew}>+ New</button>
-				{activeRequest && (
+				{user?.role !== 'user' && activeRequest && (
 					<div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
 						{!activeRequest.assigned_to_user_id && (
 							<button className="btn-secondary" type="button" onClick={assignToMe}>
@@ -379,7 +379,7 @@ export default function Requests() {
 					))}
 				</div>
 
-				<button 
+				{user?.role !== 'user' && <button 
 					className={`worksheet-btn ${showWorksheet ? 'active' : ''}`}
 					onClick={() => setShowWorksheet(!showWorksheet)}
 					title="Toggle worksheet comments"
@@ -387,14 +387,14 @@ export default function Requests() {
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
 						<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
 					</svg>
-				</button>
+				</button>}
 			</div>
 
-			<div className="status-alert-dots">
+			{user?.role !== 'user' && <div className="status-alert-dots">
 				<button type="button" className={`alert-dot in-progress ${alertStatus === 'in-progress' ? 'active' : ''}`} onClick={() => setAlertStatus('in-progress')} title="In Progress" aria-label="In Progress" />
 				<button type="button" className={`alert-dot blocked ${alertStatus === 'blocked' ? 'active' : ''}`} onClick={() => setAlertStatus('blocked')} title="Blocked" aria-label="Blocked" />
 				<button type="button" className={`alert-dot ready ${alertStatus === 'ready' ? 'active' : ''}`} onClick={() => setAlertStatus('ready')} title="Ready" aria-label="Ready" />
-			</div>
+			</div>}
 
 			<div className="table-wrap" style={{ marginTop: 10 }}>
 				<table className="table requests-table">
@@ -851,7 +851,7 @@ export default function Requests() {
 			)}
 
 			{/* Worksheet comments section */}
-			{showWorksheet && (
+			{user?.role !== 'user' && showWorksheet && (
 				<div className="worksheet-section">
 					<div className="worksheet-header">
 						<h3>Worksheet Comments</h3>
@@ -872,7 +872,7 @@ export default function Requests() {
 			)}
 
 			{/* Tabs */}
-			<div className="tabs-section">
+			{user?.role !== 'user' && <div className="tabs-section">
 				<div className="tabs-header" role="tablist" aria-label="Request notes and instructions">
 					<button
 						className={`tab-btn ${activeTab === 'notes' ? 'active' : ''}`}
@@ -911,7 +911,7 @@ export default function Requests() {
 						/>
 					)}
 				</div>
-			</div>
+			</div>}
 		</div>
 	);
 }

@@ -43,6 +43,11 @@ test('login creates an HttpOnly session and /me returns server identity', async 
   assert.match(manager.cookie, /^gg_session=/);
 });
 
+test('preset standard user can authenticate with user access', async () => {
+  const user = await login('user@demo.com', 'user');
+  assert.equal(user.user.role, 'user');
+});
+
 test('state-changing requests require CSRF token', async () => {
   const manager = await login('manager@demo.com', 'manager');
   const response = await fetch(`${baseUrl}/teams`, {
