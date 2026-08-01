@@ -1,0 +1,82 @@
+/* Dual-mode compatibility for legacy screens that predate semantic tokens. */
+html,
+body,
+#root {
+  min-height: 100%;
+  background: var(--gg-color-page);
+  color: var(--gg-color-text);
+}
+
+body {
+  transition: background-color var(--gg-duration-normal) var(--gg-ease-standard), color var(--gg-duration-normal) var(--gg-ease-standard);
+}
+
+.public-theme-toggle {
+  position: fixed;
+  bottom: var(--gg-space-4);
+  right: var(--gg-space-4);
+  z-index: 120;
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: var(--gg-space-2);
+  padding: 0 var(--gg-space-3);
+  border: 1px solid var(--gg-color-border);
+  border-radius: var(--gg-radius-pill);
+  background: var(--gg-color-surface-overlay);
+  box-shadow: var(--gg-shadow-sm);
+  color: var(--gg-color-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--gg-text-sm);
+  font-weight: 700;
+  backdrop-filter: blur(12px);
+}
+
+.public-theme-toggle:hover { border-color: var(--gg-color-border-strong); }
+.public-theme-toggle span { color: var(--gg-color-primary-text); font-size: 1rem; }
+
+.landing-layout { background: var(--gg-color-page); color: var(--gg-color-text); }
+.landing-copy,
+.landing-highlight-card,
+.landing-feature-card,
+.landing-metric-card,
+.landing-step {
+  border-color: var(--gg-color-border);
+  background: var(--gg-color-surface);
+  box-shadow: var(--gg-shadow-md);
+}
+
+.landing-copy p,
+.landing-highlight-card p,
+.landing-section-header p,
+.landing-feature-card p,
+.metric-caption,
+.landing-step p { color: var(--gg-color-text-secondary); }
+
+.landing-feature-icon {
+  border-color: var(--gg-color-border-accent);
+  background: var(--gg-color-primary-soft);
+  color: var(--gg-color-primary-text);
+}
+
+:root[data-theme='dark'] .landing-copy,
+:root[data-theme='dark'] .landing-highlight-card,
+:root[data-theme='dark'] .landing-feature-card,
+:root[data-theme='dark'] .landing-metric-card,
+:root[data-theme='dark'] .landing-step {
+  background: color-mix(in srgb, var(--gg-color-surface) 92%, var(--gg-candy-blue));
+}
+
+/* Keep dialogs comfortably inside the viewport and establish one rhythm. */
+.modal-overlay { padding: var(--gg-space-4); }
+.modal-content { max-width: calc(100vw - (2 * var(--gg-space-4))); }
+.input-group { gap: var(--gg-space-2); }
+.signup-grid { gap: var(--gg-space-4); }
+
+@media (max-width: 640px) {
+  .landing-layout { padding: var(--gg-space-4); }
+  .landing-hero { margin-top: var(--gg-space-8); gap: var(--gg-space-4); }
+  .landing-section { margin-top: var(--gg-space-8); }
+  .signup-grid { grid-template-columns: 1fr; }
+}

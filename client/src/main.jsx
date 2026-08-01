@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import App from './App.jsx';
 import Login from './pages/Login.jsx';
 import Signup from './pages/Signup.jsx';
@@ -25,6 +25,13 @@ import './styles.css';
 import './styles/tokens.css';
 import './styles/manager-theme.css';
 import './styles/auth-theme.css';
+import './styles/theme-overrides.css';
+
+const storedTheme = localStorage.getItem('gearguard-theme');
+const initialTheme = storedTheme === 'light' || storedTheme === 'dark'
+  ? storedTheme
+  : window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+document.documentElement.dataset.theme = initialTheme;
 
 const RoleBasedHome = () => {
   const user = getSessionUser();
@@ -33,10 +40,24 @@ const RoleBasedHome = () => {
 
 const RoleBasedRequests = () => getSessionUser()?.role === 'user' ? <UserRequests /> : <Requests />;
 
+const PublicThemeToggle = () => {
+  const location = useLocation();
+  const [theme, setTheme] = React.useState(() => document.documentElement.dataset.theme || 'light');
+  if (location.pathname.startsWith('/app')) return null;
+  const toggle = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem('gearguard-theme', next);
+    setTheme(next);
+  };
+  return <button type="button" className="public-theme-toggle" onClick={toggle} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}><span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>{theme === 'dark' ? 'Light' : 'Dark'}</button>;
+};
+
 const root = createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <BrowserRouter>
+      <PublicThemeToggle />
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />

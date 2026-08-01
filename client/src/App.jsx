@@ -8,6 +8,7 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const [isManagerMenuOpen, setIsManagerMenuOpen] = React.useState(false);
+  const [theme, setTheme] = React.useState(() => document.documentElement.dataset.theme || 'light');
   const managerMenuButtonRef = React.useRef(null);
   const managerSidebarRef = React.useRef(null);
   const isEquipmentPage = location.pathname.startsWith('/app/equipment');
@@ -31,6 +32,15 @@ export default function App() {
     sessionStorage.removeItem('csrf_token');
     navigate('/login');
   }, [navigate]);
+
+  const toggleTheme = React.useCallback(() => {
+    setTheme((current) => {
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.dataset.theme = next;
+      localStorage.setItem('gearguard-theme', next);
+      return next;
+    });
+  }, []);
 
   React.useEffect(() => {
     setIsManagerMenuOpen(false);
@@ -199,6 +209,7 @@ export default function App() {
         {usesOperationsShell ? (
           <div className="manager-sidebar__footer">
             <div className="manager-sidebar__user"><strong>{user?.name || workspaceLabel}</strong><span>{user?.email || `${workspaceLabel} account`}</span>{isAdmin && <em>System administrator</em>}</div>
+            <button type="button" className="manager-theme-toggle" aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} aria-pressed={theme === 'dark'} onClick={toggleTheme}><span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span><span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span></button>
             <button type="button" className="sidebar-logout" onClick={handleLogout}>Log out</button>
           </div>
         ) : (
