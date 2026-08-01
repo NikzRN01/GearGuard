@@ -84,6 +84,25 @@ body {
   color: var(--gg-color-primary-text);
 }
 
+:root[data-theme='light'] .manager-sidebar.app-sidebar {
+  --gg-color-surface: var(--gg-blue-900);
+  --gg-color-surface-subtle: var(--gg-blue-800);
+  --gg-color-surface-raised: var(--gg-blue-700);
+  --gg-color-border: color-mix(in srgb, var(--gg-blue-600) 72%, var(--gg-blue-900));
+  --gg-color-border-strong: var(--gg-blue-600);
+  --gg-color-text: #f4f8fa;
+  --gg-color-text-secondary: #d7e6ec;
+  --gg-color-text-muted: #a9c4d0;
+  --gg-color-primary-text: var(--gg-candy-blue);
+  background: linear-gradient(180deg, var(--gg-blue-900), #071f2a);
+}
+
+:root[data-theme='light'] .manager-sidebar a.active {
+  background: var(--gg-candy-blue);
+  box-shadow: inset 3px 0 #ffffff;
+  color: var(--gg-onyx);
+}
+
 .landing-feature-icon {
   border-color: var(--gg-color-border-accent);
   background: var(--gg-color-primary-soft);
