@@ -22,6 +22,7 @@ import Teams from './pages/Teams.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import RoleRoute from './shared/RoleRoute.jsx';
 import { getDefaultAppPath, getSessionUser } from './services/session';
+import { applyTheme, resolveInitialTheme, THEME_STORAGE_KEY } from './services/theme';
 import './styles.css';
 import './styles/tokens.css';
 import './styles/manager-theme.css';
@@ -29,11 +30,10 @@ import './styles/auth-theme.css';
 import './styles/theme-overrides.css';
 import './styles/tailwind.css';
 
-const storedTheme = localStorage.getItem('gearguard-theme');
-const initialTheme = storedTheme === 'light' || storedTheme === 'dark'
-  ? storedTheme
-  : window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-document.documentElement.dataset.theme = initialTheme;
+// Paint the stored theme onto <html> before React mounts, so the first frame is
+// not the wrong colour. See services/theme.js for why every call in there is
+// guarded: this runs at module scope, and a throw here costs the whole app.
+const initialTheme = applyTheme(resolveInitialTheme());
 
 const RoleBasedHome = () => {
   const user = getSessionUser();
@@ -56,7 +56,7 @@ const PublicThemeToggle = () => {
 const root = createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <ThemeProvider attribute="data-theme" storageKey="gearguard-theme" defaultTheme={initialTheme} enableSystem={false}>
+    <ThemeProvider attribute="data-theme" storageKey={THEME_STORAGE_KEY} defaultTheme={initialTheme} enableSystem={false}>
       <BrowserRouter>
         <PublicThemeToggle />
         <Routes>

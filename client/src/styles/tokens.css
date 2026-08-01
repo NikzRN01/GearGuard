@@ -50,7 +50,10 @@
   --gg-color-border-accent: rgba(57, 127, 158, 0.36);
   --gg-color-text: #101416;
   --gg-color-text-secondary: #3d4a50;
-  --gg-color-text-muted: #687980;
+  /* Clears WCAG AA (4.5:1) on every light background it lands on - surface
+     5.14, page 4.73, subtle 4.54 - while staying lighter than secondary text
+     so the type hierarchy still reads. */
+  --gg-color-text-muted: #5b6c73;
   --gg-color-text-inverse: #ffffff;
 
   --gg-color-primary: var(--gg-candy-blue);
@@ -117,6 +120,15 @@
   --gg-color-warning: #f0b54f;
   --gg-color-danger: #ff7c8b;
   --gg-color-info: var(--gg-candy-blue);
+  /* Badge and alert fills. Without these the light-theme tints carried over:
+     a 13% wash of a mid-tone colour over a near-black surface composites to
+     roughly #0f221d, which is indistinguishable from the surface itself. Each
+     is re-tinted from its own dark-theme colour at the same weight as
+     --gg-color-primary-soft-strong, so all four chips read alike. */
+  --gg-color-success-soft: rgba(87, 209, 154, 0.2);
+  --gg-color-warning-soft: rgba(240, 181, 79, 0.2);
+  --gg-color-danger-soft: rgba(255, 124, 139, 0.2);
+  --gg-color-info-soft: rgba(178, 213, 229, 0.2);
   --gg-color-neutral-soft: rgba(255, 255, 255, 0.07);
   --gg-color-focus: var(--gg-candy-blue);
   --gg-color-focus-ring: rgba(178, 213, 229, 0.34);

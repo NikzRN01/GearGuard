@@ -8,7 +8,10 @@ export default function AuthCard({ title, subtitle, children, className }) {
 
   return (
     <div className="auth-layout">
-      <DottedSurface className="auth-dotted-surface" size={5} opacity={0.12} lightOnly />
+      {/* Renders in both themes: the surface already picks its own dot colour
+          per theme, so restricting it to light left the dark auth screen with a
+          flat background. 0.12 was also faint enough to read as "missing". */}
+      <DottedSurface className="auth-dotted-surface" size={5} opacity={0.28} />
       <main className="auth-shell">
         <section className="auth-brand-panel" aria-label="GearGuard product information">
           <div className="auth-brand-lockup">

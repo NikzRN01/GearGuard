@@ -27,7 +27,12 @@ export function DottedSurface({
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || navigator.userAgent.includes("jsdom") || (lightOnly && theme !== "light")) return;
+    // Wait for next-themes to resolve before building anything. It reports
+    // `undefined` on the first render, so starting here would spin up a WebGL
+    // context for the wrong palette and immediately tear it down to build a
+    // second one - two contexts per mount against a browser cap of about 16.
+    if (!container || !theme || navigator.userAgent.includes("jsdom")) return;
+    if (lightOnly && theme !== "light") return;
 
     const SEPARATION = 150;
     const AMOUNTX = 40;
@@ -111,6 +116,12 @@ export function DottedSurface({
       cancelAnimationFrame(animationId);
       geometry.dispose();
       material.dispose();
+      // dispose() frees Three's own objects but leaves the underlying WebGL
+      // context alive. Browsers cap live contexts (~16), and this effect re-runs
+      // on every theme change - twice per mount, since next-themes resolves
+      // after the first render - so without an explicit release the canvases
+      // start coming back blank once the cap is hit.
+      renderer.forceContextLoss();
       renderer.dispose();
       renderer.domElement.remove();
     };
