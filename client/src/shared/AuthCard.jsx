@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import DottedSurface from '@/components/ui/dotted-surface';
 
 export default function AuthCard({ title, subtitle, children, className }) {
   const { pathname } = useLocation();
@@ -7,6 +8,7 @@ export default function AuthCard({ title, subtitle, children, className }) {
 
   return (
     <div className="auth-layout">
+      <DottedSurface className="auth-dotted-surface" size={5} opacity={0.12} lightOnly />
       <main className="auth-shell">
         <section className="auth-brand-panel" aria-label="GearGuard product information">
           <div className="auth-brand-lockup">

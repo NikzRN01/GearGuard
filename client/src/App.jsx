@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTheme } from 'next-themes';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { getSessionUser } from './services/session';
 import { api } from './services/api';
@@ -8,7 +9,7 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const [isManagerMenuOpen, setIsManagerMenuOpen] = React.useState(false);
-  const [theme, setTheme] = React.useState(() => document.documentElement.dataset.theme || 'light');
+  const { resolvedTheme: theme, setTheme } = useTheme();
   const managerMenuButtonRef = React.useRef(null);
   const managerSidebarRef = React.useRef(null);
   const isEquipmentPage = location.pathname.startsWith('/app/equipment');
@@ -34,13 +35,8 @@ export default function App() {
   }, [navigate]);
 
   const toggleTheme = React.useCallback(() => {
-    setTheme((current) => {
-      const next = current === 'dark' ? 'light' : 'dark';
-      document.documentElement.dataset.theme = next;
-      localStorage.setItem('gearguard-theme', next);
-      return next;
-    });
-  }, []);
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  }, [setTheme, theme]);
 
   React.useEffect(() => {
     setIsManagerMenuOpen(false);

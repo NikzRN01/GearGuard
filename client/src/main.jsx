@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { ThemeProvider, useTheme } from 'next-themes';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import App from './App.jsx';
 import Login from './pages/Login.jsx';
@@ -26,6 +27,7 @@ import './styles/tokens.css';
 import './styles/manager-theme.css';
 import './styles/auth-theme.css';
 import './styles/theme-overrides.css';
+import './styles/tailwind.css';
 
 const storedTheme = localStorage.getItem('gearguard-theme');
 const initialTheme = storedTheme === 'light' || storedTheme === 'dark'
@@ -42,12 +44,10 @@ const RoleBasedRequests = () => getSessionUser()?.role === 'user' ? <UserRequest
 
 const PublicThemeToggle = () => {
   const location = useLocation();
-  const [theme, setTheme] = React.useState(() => document.documentElement.dataset.theme || 'light');
+  const { resolvedTheme: theme, setTheme } = useTheme();
   if (location.pathname.startsWith('/app')) return null;
   const toggle = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.dataset.theme = next;
-    localStorage.setItem('gearguard-theme', next);
     setTheme(next);
   };
   return <button type="button" className="public-theme-toggle" onClick={toggle} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}><span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>{theme === 'dark' ? 'Light' : 'Dark'}</button>;
@@ -56,9 +56,10 @@ const PublicThemeToggle = () => {
 const root = createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <BrowserRouter>
-      <PublicThemeToggle />
-      <Routes>
+    <ThemeProvider attribute="data-theme" storageKey="gearguard-theme" defaultTheme={initialTheme} enableSystem={false}>
+      <BrowserRouter>
+        <PublicThemeToggle />
+        <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
@@ -82,7 +83,8 @@ root.render(
           <Route path="teams" element={<RoleRoute allowedRoles={['user', 'manager', 'technician', 'admin']}><Teams /></RoleRoute>} />
         </Route>
 
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </ThemeProvider>
   </React.StrictMode>
 );

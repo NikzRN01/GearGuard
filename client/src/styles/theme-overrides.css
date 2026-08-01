@@ -37,6 +37,14 @@ body {
 .public-theme-toggle span { color: var(--gg-color-primary-text); font-size: 1rem; }
 
 .landing-layout { background: var(--gg-color-page); color: var(--gg-color-text); }
+.landing-layout { position: relative; isolation: isolate; background: transparent; }
+.landing-layout > :not(.landing-dotted-surface) { position: relative; z-index: 1; }
+.landing-dotted-surface { z-index: 0; overflow: hidden; }
+.landing-dotted-surface canvas { display: block; width: 100%; height: 100%; }
+.auth-layout { position: relative; isolation: isolate; }
+.auth-layout > :not(.auth-dotted-surface) { position: relative; z-index: 1; }
+.auth-dotted-surface { z-index: 0; overflow: hidden; }
+.auth-dotted-surface canvas { display: block; width: 100%; height: 100%; }
 .landing-copy,
 .landing-highlight-card,
 .landing-feature-card,
@@ -65,6 +73,74 @@ body {
 :root[data-theme='light'] .landing-cta-band {
   border-color: var(--gg-color-border-accent);
   background: linear-gradient(135deg, #e4f1f6, var(--gg-color-primary-soft-strong));
+}
+
+/* Light public surfaces need a stronger depth hierarchy than plain white
+   cards on a pale page. The blue atmosphere remains visible through the
+   panels while text and controls stay fully opaque. */
+:root[data-theme='light'] .landing-layout {
+  background:
+    radial-gradient(circle at 8% 15%, rgba(178, 213, 229, 0.22), transparent 30%),
+    radial-gradient(circle at 92% 48%, rgba(36, 106, 134, 0.06), transparent 32%),
+    linear-gradient(180deg, #f1f4f3 0%, #e9efef 52%, #f0f3f2 100%);
+}
+
+:root[data-theme='light'] .landing-nav {
+  padding: 10px 14px;
+  border: 1px solid rgba(174, 190, 197, 0.62);
+  border-radius: var(--gg-radius-lg);
+  background: rgba(244, 247, 246, 0.82);
+  box-shadow: 0 8px 24px rgba(11, 47, 64, 0.055);
+  backdrop-filter: blur(16px);
+}
+
+:root[data-theme='light'] .landing-copy,
+:root[data-theme='light'] .landing-highlight-card,
+:root[data-theme='light'] .landing-feature-card,
+:root[data-theme='light'] .landing-metric-card,
+:root[data-theme='light'] .landing-step {
+  border-color: rgba(174, 190, 197, 0.66);
+  background: rgba(246, 248, 247, 0.88);
+  box-shadow: 0 14px 32px rgba(11, 47, 64, 0.065), 0 1px 2px rgba(11, 47, 64, 0.04);
+  backdrop-filter: blur(12px);
+}
+
+:root[data-theme='light'] .landing-copy {
+  border-top: 3px solid var(--gg-blue-600);
+}
+
+:root[data-theme='light'] .landing-highlight-card,
+:root[data-theme='light'] .landing-feature-card,
+:root[data-theme='light'] .landing-metric-card,
+:root[data-theme='light'] .landing-step {
+  transition: transform var(--gg-duration-normal) var(--gg-ease-standard), border-color var(--gg-duration-normal) var(--gg-ease-standard), box-shadow var(--gg-duration-normal) var(--gg-ease-standard);
+}
+
+:root[data-theme='light'] .landing-highlight-card:hover,
+:root[data-theme='light'] .landing-feature-card:hover,
+:root[data-theme='light'] .landing-metric-card:hover,
+:root[data-theme='light'] .landing-step:hover {
+  transform: translateY(-3px);
+  border-color: var(--gg-blue-400);
+  box-shadow: 0 18px 38px rgba(11, 47, 64, 0.1);
+}
+
+:root[data-theme='light'] .landing-metric-card h3,
+:root[data-theme='light'] .metric-value {
+  color: var(--gg-blue-800);
+}
+
+:root[data-theme='light'] .landing-feature-icon,
+:root[data-theme='light'] .landing-step span {
+  border-color: rgba(36, 106, 134, 0.34);
+  background: #dce9ed;
+  color: var(--gg-blue-800);
+}
+
+:root[data-theme='light'] .landing-cta-band {
+  border: 1px solid rgba(36, 106, 134, 0.35);
+  background: linear-gradient(120deg, rgba(218, 231, 235, 0.94), rgba(197, 218, 226, 0.72));
+  box-shadow: 0 16px 36px rgba(11, 47, 64, 0.085);
 }
 
 :root[data-theme='light'] .landing-cta-band h2 { color: var(--gg-color-text); }
@@ -101,6 +177,73 @@ body {
   background: var(--gg-candy-blue);
   box-shadow: inset 3px 0 #ffffff;
   color: var(--gg-onyx);
+}
+
+/* Light authentication gets its own composition: deep blue for authority,
+   cool whites for depth, and Candy Blue as a supporting accent. */
+:root[data-theme='light'] .auth-layout {
+  background:
+    radial-gradient(circle at 14% 18%, rgba(178, 213, 229, 0.22), transparent 30%),
+    radial-gradient(circle at 86% 82%, rgba(36, 106, 134, 0.07), transparent 32%),
+    linear-gradient(145deg, #eff3f2, #e7eded);
+}
+
+:root[data-theme='light'] .auth-shell {
+  border-color: #adc5cf;
+  background: rgba(244, 247, 246, 0.96);
+  box-shadow: 0 30px 72px rgba(11, 47, 64, 0.15), 0 2px 8px rgba(11, 47, 64, 0.07);
+  backdrop-filter: blur(18px);
+}
+
+:root[data-theme='light'] .auth-brand-panel {
+  background:
+    radial-gradient(circle at 15% 10%, rgba(178, 213, 229, 0.22), transparent 27%),
+    linear-gradient(155deg, var(--gg-blue-900), #061c26 72%);
+  box-shadow: inset -1px 0 rgba(178, 213, 229, 0.2);
+}
+
+:root[data-theme='light'] .auth-layout .auth-card { background: rgba(244, 247, 246, 0.94); }
+:root[data-theme='light'] .auth-eyebrow { color: var(--gg-blue-700); }
+
+:root[data-theme='light'] .auth-layout .input-group input,
+:root[data-theme='light'] .auth-layout .input-select,
+:root[data-theme='light'] .auth-layout .gg-select-menu__trigger,
+:root[data-theme='light'] .auth-dialog .modal-input {
+  border-color: #bfd0d8;
+  background: #f8faf9;
+  color: var(--gg-color-text);
+  box-shadow: 0 1px 2px rgba(11, 47, 64, 0.04);
+}
+
+:root[data-theme='light'] .auth-layout .input-group input:hover,
+:root[data-theme='light'] .auth-layout .input-select:hover,
+:root[data-theme='light'] .auth-layout .gg-select-menu__trigger:hover {
+  border-color: var(--gg-blue-600);
+}
+
+:root[data-theme='light'] .auth-layout .input-group input:focus,
+:root[data-theme='light'] .auth-layout .input-select:focus,
+:root[data-theme='light'] .auth-layout .gg-select-menu__trigger[aria-expanded='true'] {
+  border-color: var(--gg-blue-600);
+  background: #f8faf9;
+  box-shadow: 0 0 0 3px rgba(36, 106, 134, 0.16);
+}
+
+:root[data-theme='light'] .auth-layout .gg-button--primary {
+  border-color: var(--gg-blue-700);
+  background: var(--gg-blue-700);
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(23, 74, 97, 0.2);
+}
+
+:root[data-theme='light'] .auth-layout .gg-button--primary:hover:not(:disabled) {
+  border-color: var(--gg-blue-800);
+  background: var(--gg-blue-800);
+  color: #ffffff;
+}
+
+:root[data-theme='light'] .auth-layout .auth-switch {
+  border-top-color: #d4e0e5;
 }
 
 .landing-feature-icon {
@@ -254,4 +397,11 @@ body {
   .landing-hero { margin-top: var(--gg-space-8); gap: var(--gg-space-4); }
   .landing-section { margin-top: var(--gg-space-8); }
   .signup-grid { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme='light'] .landing-highlight-card:hover,
+  :root[data-theme='light'] .landing-feature-card:hover,
+  :root[data-theme='light'] .landing-metric-card:hover,
+  :root[data-theme='light'] .landing-step:hover { transform: none; }
 }

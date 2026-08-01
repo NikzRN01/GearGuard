@@ -40,13 +40,13 @@
   --gg-red-500: #bd3f4e;
   --gg-red-600: #9c303d;
 
-  --gg-color-page: #f3f7f8;
-  --gg-color-surface: #ffffff;
-  --gg-color-surface-subtle: #edf3f5;
-  --gg-color-surface-raised: #e2ecef;
-  --gg-color-surface-overlay: rgba(255, 255, 255, 0.96);
-  --gg-color-border: #d5e0e4;
-  --gg-color-border-strong: #aebec5;
+  --gg-color-page: #ecefef;
+  --gg-color-surface: #f7f8f6;
+  --gg-color-surface-subtle: #e6ebea;
+  --gg-color-surface-raised: #dce5e5;
+  --gg-color-surface-overlay: rgba(247, 248, 246, 0.96);
+  --gg-color-border: #ced8d8;
+  --gg-color-border-strong: #a8b8ba;
   --gg-color-border-accent: rgba(57, 127, 158, 0.36);
   --gg-color-text: #101416;
   --gg-color-text-secondary: #3d4a50;
