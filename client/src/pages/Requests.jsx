@@ -125,9 +125,9 @@ export default function Requests() {
 		}
 	};
 
+	// Picklists are reference data; loading them once on mount is intentional.
 	useEffect(() => {
 		loadPicklists();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
 	useEffect(() => {

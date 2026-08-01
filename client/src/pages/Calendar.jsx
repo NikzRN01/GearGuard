@@ -6,6 +6,45 @@ import EmptyState from '../components/ui/EmptyState';
 import PageHeader from '../components/ui/PageHeader';
 import { getSessionUser } from '../services/session';
 
+// Pure date helpers: they read nothing from the component, so they live at
+// module scope. That also keeps them out of every hook dependency list.
+const toDateOnly = (value) => {
+	if (!value) return null;
+	// If value is YYYY-MM-DD, force local midnight to avoid timezone shifting
+	if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+		return new Date(`${value}T00:00:00`);
+	}
+	const d = new Date(value);
+	return Number.isNaN(d.getTime()) ? null : d;
+};
+
+const formatHHmm = (d) => {
+	const hh = String(d.getHours()).padStart(2, '0');
+	const mm = String(d.getMinutes()).padStart(2, '0');
+	return `${hh}:${mm}`;
+};
+
+const buildEventTimes = (scheduledDate) => {
+	const d = toDateOnly(scheduledDate);
+	if (!d) {
+		return { date: null, startTime: '09:00', endTime: '10:00' };
+	}
+
+	// If backend provided no time info (midnight), default to a morning slot
+	if (d.getHours() === 0 && d.getMinutes() === 0) {
+		const start = new Date(d);
+		start.setHours(9, 0, 0, 0);
+		const end = new Date(d);
+		end.setHours(10, 0, 0, 0);
+		return { date: d, startTime: formatHHmm(start), endTime: formatHHmm(end) };
+	}
+
+	const start = d;
+	const end = new Date(d);
+	end.setHours(end.getHours() + 1);
+	return { date: d, startTime: formatHHmm(start), endTime: formatHHmm(end) };
+};
+
 export default function Calendar() {
 	const isAdmin = getSessionUser()?.role === 'admin';
 	const [currentDate, setCurrentDate] = useState(new Date());
@@ -13,43 +52,6 @@ export default function Calendar() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState('');
 	const [scheduledRequests, setScheduledRequests] = useState([]);
-
-	const toDateOnly = (value) => {
-		if (!value) return null;
-		// If value is YYYY-MM-DD, force local midnight to avoid timezone shifting
-		if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-			return new Date(`${value}T00:00:00`);
-		}
-		const d = new Date(value);
-		return Number.isNaN(d.getTime()) ? null : d;
-	};
-
-	const formatHHmm = (d) => {
-		const hh = String(d.getHours()).padStart(2, '0');
-		const mm = String(d.getMinutes()).padStart(2, '0');
-		return `${hh}:${mm}`;
-	};
-
-	const buildEventTimes = (scheduledDate) => {
-		const d = toDateOnly(scheduledDate);
-		if (!d) {
-			return { date: null, startTime: '09:00', endTime: '10:00' };
-		}
-
-		// If backend provided no time info (midnight), default to a morning slot
-		if (d.getHours() === 0 && d.getMinutes() === 0) {
-			const start = new Date(d);
-			start.setHours(9, 0, 0, 0);
-			const end = new Date(d);
-			end.setHours(10, 0, 0, 0);
-			return { date: d, startTime: formatHHmm(start), endTime: formatHHmm(end) };
-		}
-
-		const start = d;
-		const end = new Date(d);
-		end.setHours(end.getHours() + 1);
-		return { date: d, startTime: formatHHmm(start), endTime: formatHHmm(end) };
-	};
 
 	useEffect(() => {
 		let cancelled = false;

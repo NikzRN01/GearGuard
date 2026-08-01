@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 export default function SelectMenu({ value, options, onChange, ariaLabel, disabled = false, portal = false }) {
@@ -17,10 +17,12 @@ export default function SelectMenu({ value, options, onChange, ariaLabel, disabl
     if (restoreFocus) requestAnimationFrame(() => triggerRef.current?.focus());
   };
 
-  const focusOption = (index) => {
+  // Identity has to be stable: the open/focus effect below depends on it, and a
+  // function rebuilt every render would re-run that effect on every render.
+  const focusOption = useCallback((index) => {
     const next = (index + options.length) % options.length;
     optionRefs.current[next]?.focus();
-  };
+  }, [options.length]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -30,7 +32,7 @@ export default function SelectMenu({ value, options, onChange, ariaLabel, disabl
     };
     document.addEventListener('pointerdown', handlePointerDown);
     return () => document.removeEventListener('pointerdown', handlePointerDown);
-  }, [open, selectedIndex]);
+  }, [open, selectedIndex, focusOption]);
 
   useEffect(() => {
     if (!open || !portal) return undefined;

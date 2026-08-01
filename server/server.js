@@ -100,7 +100,7 @@ app.use((req, res) => {
 
 // Central error handler. Only messages raised deliberately are echoed back;
 // everything else becomes a generic 500 so internals are never disclosed.
-// eslint-disable-next-line no-unused-vars
+// The unused `next` is required: Express identifies error handlers by arity.
 app.use((error, req, res, next) => {
   if (error instanceof HttpError) {
     return res.status(error.status).json({ success: false, message: error.message });

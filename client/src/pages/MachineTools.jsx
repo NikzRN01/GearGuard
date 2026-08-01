@@ -31,10 +31,12 @@ export default function MachineTools() {
         finally { setLoading(false); }
     };
 
+    // canManage is derived from the session and does not change while mounted,
+    // so listing it costs nothing and keeps the dependency list truthful.
     useEffect(() => {
         loadEquipment();
         if (canManage) api.get('/teams').then(({ data }) => setTeams(data?.data || [])).catch(() => setTeams([]));
-    }, []);
+    }, [canManage]);
 
     useEffect(() => {
         if (!editing) return undefined;

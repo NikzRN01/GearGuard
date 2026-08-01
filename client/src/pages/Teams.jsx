@@ -35,11 +35,13 @@ export default function Teams() {
         user_id: ''
     });
 
-    // Fetch teams from backend on component mount
+    // Fetch teams from backend on component mount. canManageTeams is derived
+    // from the session and does not change while mounted, so listing it costs
+    // nothing and keeps the dependency list truthful.
     useEffect(() => {
         fetchTeams();
         if (canManageTeams) fetchUsers();
-    }, []);
+    }, [canManageTeams]);
 
     useEffect(() => {
         if (!showForm && !showAddMember) return undefined;
@@ -65,7 +67,7 @@ export default function Teams() {
                                 ...team,
                                 members: memberData.data?.data?.members || []
                             };
-                        } catch (err) {
+                        } catch {
                             return { ...team, members: [] };
                         }
                     })

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import Alert from '../components/ui/Alert';
@@ -36,7 +36,9 @@ const TechnicianDashboard = () => {
     return userData ? JSON.parse(userData) : null;
   }, []);
 
-  const load = async () => {
+  // Stable while the signed-in identity is stable, so the effect below can
+  // depend on it honestly instead of omitting it.
+  const load = useCallback(async () => {
     setError('');
     setLoading(true);
     try {
@@ -50,7 +52,7 @@ const TechnicianDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
   useEffect(() => {
     // Without an identity the request can only come back 401, and the filter
@@ -60,7 +62,7 @@ const TechnicianDashboard = () => {
       return;
     }
     load();
-  }, [user?.id]);
+  }, [user?.id, load]);
 
   const stats = useMemo(() => {
     const open = requests.filter((request) => !CLOSED_STATUSES.has(String(request.status || '').toLowerCase()));

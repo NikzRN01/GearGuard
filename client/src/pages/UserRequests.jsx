@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import Button from '../components/ui/Button';
@@ -28,7 +28,9 @@ export default function UserRequests() {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const load = async () => {
+  // Depends only on the query string, so its identity is stable between
+  // navigations and the effect below can list it honestly.
+  const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -44,9 +46,9 @@ export default function UserRequests() {
     } catch (err) {
       setError(err?.response?.data?.message || 'Failed to load your requests');
     } finally { setLoading(false); }
-  };
+  }, [location.search]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
   useEffect(() => { if (location.state?.openNew) setOpen(true); }, [location.state]);
   useEffect(() => {
     if (!open) return undefined;

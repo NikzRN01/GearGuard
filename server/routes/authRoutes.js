@@ -10,7 +10,6 @@ const {
   conflict,
   forbidden,
   requiredString,
-  optionalEnum,
   route,
   isUniqueViolation
 } = require('../lib/validation');
