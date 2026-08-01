@@ -588,7 +588,7 @@
 
 .gg-select-menu__option[aria-selected='true'] {
   background: var(--gg-color-primary);
-  color: var(--gg-color-accent);
+  color: var(--gg-color-primary-contrast);
   font-weight: 750;
 }
 
@@ -606,7 +606,11 @@
 }
 
 .gg-badge--info { border-color: rgba(90, 166, 255, 0.38); background: var(--gg-color-info-soft); color: var(--gg-color-info); }
-.gg-badge--active { border-color: var(--gg-color-border-accent); background: var(--gg-color-primary-soft-strong); color: var(--gg-color-accent-bright); }
+.gg-badge--active {
+  border-color: color-mix(in srgb, var(--gg-color-primary-text) 42%, var(--gg-color-border));
+  background: var(--gg-color-primary-soft-strong);
+  color: var(--gg-color-primary-text);
+}
 .gg-badge--warning { border-color: rgba(251, 191, 36, 0.38); background: var(--gg-color-warning-soft); color: var(--gg-color-warning); }
 .gg-badge--danger { border-color: rgba(248, 113, 113, 0.38); background: var(--gg-color-danger-soft); color: var(--gg-color-danger); }
 .gg-badge--success { border-color: rgba(69, 209, 156, 0.38); background: var(--gg-color-success-soft); color: var(--gg-color-success); }

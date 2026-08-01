@@ -54,6 +54,36 @@ body {
 .metric-caption,
 .landing-step p { color: var(--gg-color-text-secondary); }
 
+.landing-cta-band p { color: var(--gg-color-text-secondary); }
+
+.landing-step span {
+  border-color: var(--gg-color-border-accent);
+  background: var(--gg-color-primary-soft-strong);
+  color: var(--gg-color-primary-text);
+}
+
+:root[data-theme='light'] .landing-cta-band {
+  border-color: var(--gg-color-border-accent);
+  background: linear-gradient(135deg, #e4f1f6, var(--gg-color-primary-soft-strong));
+}
+
+:root[data-theme='light'] .landing-cta-band h2 { color: var(--gg-color-text); }
+:root[data-theme='light'] .landing-cta-band p { color: var(--gg-color-text-secondary); }
+
+:root[data-theme='light'] .landing-layout .brand {
+  color: var(--gg-color-primary-text);
+  background: linear-gradient(135deg, var(--gg-blue-700), var(--gg-blue-600));
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+}
+
+:root[data-theme='light'] .landing-kicker,
+:root[data-theme='light'] .landing-section-kicker {
+  color: var(--gg-color-primary-text);
+}
+
 .landing-feature-icon {
   border-color: var(--gg-color-border-accent);
   background: var(--gg-color-primary-soft);
@@ -66,6 +96,132 @@ body {
 :root[data-theme='dark'] .landing-metric-card,
 :root[data-theme='dark'] .landing-step {
   background: color-mix(in srgb, var(--gg-color-surface) 92%, var(--gg-candy-blue));
+}
+
+/* Light mode interactive contrast pass. Legacy controls originally assumed a
+   dark canvas; these rules deliberately leave dark mode unchanged. */
+:root[data-theme='light'] button,
+:root[data-theme='light'] input,
+:root[data-theme='light'] select,
+:root[data-theme='light'] textarea {
+  color: var(--gg-color-text);
+}
+
+:root[data-theme='light'] input::placeholder,
+:root[data-theme='light'] textarea::placeholder {
+  color: var(--gg-color-text-muted);
+  opacity: 1;
+}
+
+:root[data-theme='light'] .form-input,
+:root[data-theme='light'] .modal-input,
+:root[data-theme='light'] .input-select,
+:root[data-theme='light'] .calendar-view-select,
+:root[data-theme='light'] .manager-form-section select {
+  border-color: var(--gg-color-border);
+  background-color: var(--gg-color-surface);
+  color: var(--gg-color-text);
+}
+
+:root[data-theme='light'] .form-input:hover:not(:disabled),
+:root[data-theme='light'] .modal-input:hover:not(:disabled),
+:root[data-theme='light'] .input-select:hover:not(:disabled),
+:root[data-theme='light'] .calendar-view-select:hover:not(:disabled) {
+  border-color: var(--gg-color-border-strong);
+  background-color: var(--gg-color-surface);
+}
+
+:root[data-theme='light'] .form-input:focus,
+:root[data-theme='light'] .modal-input:focus,
+:root[data-theme='light'] .input-select:focus,
+:root[data-theme='light'] .calendar-view-select:focus {
+  border-color: var(--gg-color-focus);
+  background-color: var(--gg-color-surface);
+  box-shadow: 0 0 0 3px var(--gg-color-focus-ring);
+}
+
+:root[data-theme='light'] select.form-input,
+:root[data-theme='light'] .input-select,
+:root[data-theme='light'] .calendar-view-select {
+  background-image: none;
+}
+
+:root[data-theme='light'] select option {
+  background: var(--gg-color-surface);
+  color: var(--gg-color-text);
+}
+
+:root[data-theme='light'] .btn-primary,
+:root[data-theme='light'] .btn-accent,
+:root[data-theme='light'] .btn-new {
+  border-color: var(--gg-color-primary);
+  background: var(--gg-color-primary);
+  color: var(--gg-color-primary-contrast);
+  text-shadow: none;
+}
+
+:root[data-theme='light'] .btn-primary:hover:not(:disabled),
+:root[data-theme='light'] .btn-accent:hover:not(:disabled),
+:root[data-theme='light'] .btn-new:hover:not(:disabled) {
+  background: var(--gg-color-primary-hover);
+  color: var(--gg-color-primary-contrast);
+}
+
+:root[data-theme='light'] .btn-secondary {
+  border-color: var(--gg-color-border-strong);
+  background: var(--gg-color-surface);
+  color: var(--gg-color-text-secondary);
+}
+
+:root[data-theme='light'] .btn-secondary:hover:not(:disabled) {
+  border-color: var(--gg-color-primary-text);
+  background: var(--gg-color-primary-soft);
+  color: var(--gg-color-text);
+}
+
+:root[data-theme='light'] .gg-button:disabled,
+:root[data-theme='light'] .btn-primary:disabled,
+:root[data-theme='light'] .btn-accent:disabled,
+:root[data-theme='light'] .btn-new:disabled,
+:root[data-theme='light'] .btn-secondary:disabled,
+:root[data-theme='light'] .gg-select-menu__trigger:disabled,
+:root[data-theme='light'] input:disabled,
+:root[data-theme='light'] select:disabled,
+:root[data-theme='light'] textarea:disabled {
+  opacity: 0.7;
+}
+
+:root[data-theme='light'] input:disabled,
+:root[data-theme='light'] select:disabled,
+:root[data-theme='light'] textarea:disabled {
+  border-color: var(--gg-color-border);
+  background: var(--gg-color-surface-subtle);
+  color: var(--gg-color-text-secondary);
+  -webkit-text-fill-color: var(--gg-color-text-secondary);
+}
+
+:root[data-theme='light'] .link-secondary,
+:root[data-theme='light'] .auth-switch a,
+:root[data-theme='light'] .manager-table-link,
+:root[data-theme='light'] .gg-button--tertiary {
+  color: var(--gg-color-primary-text);
+}
+
+:root[data-theme='light'] .request-top-bar,
+:root[data-theme='light'] .worksheet-section,
+:root[data-theme='light'] .request-details-card,
+:root[data-theme='light'] .modal-content {
+  border-color: var(--gg-color-border);
+  background: var(--gg-color-surface);
+  color: var(--gg-color-text);
+}
+
+:root[data-theme='light'] input:-webkit-autofill,
+:root[data-theme='light'] input:-webkit-autofill:hover,
+:root[data-theme='light'] input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--gg-color-text);
+  box-shadow: 0 0 0 1000px var(--gg-color-surface) inset;
+  caret-color: var(--gg-color-text);
 }
 
 /* Keep dialogs comfortably inside the viewport and establish one rhythm. */

@@ -10,10 +10,10 @@
   --gg-blue-300: #b2d5e5;
   --gg-blue-400: #8fc1d6;
   --gg-blue-500: #68a9c5;
-  --gg-blue-600: #397f9e;
-  --gg-blue-700: #2c667f;
-  --gg-blue-800: #204b5e;
-  --gg-blue-900: #15323f;
+  --gg-blue-600: #246a86;
+  --gg-blue-700: #174a61;
+  --gg-blue-800: #103b4f;
+  --gg-blue-900: #0b2f40;
 
   --gg-navy-50: #f7fafb;
   --gg-navy-100: #edf3f5;
@@ -59,8 +59,8 @@
   --gg-color-primary-contrast: var(--gg-onyx);
   --gg-color-primary-soft: rgba(178, 213, 229, 0.36);
   --gg-color-primary-soft-strong: rgba(178, 213, 229, 0.58);
-  --gg-color-primary-text: #245f78;
-  --gg-color-accent: #397f9e;
+  --gg-color-primary-text: var(--gg-blue-700);
+  --gg-color-accent: var(--gg-blue-600);
   --gg-color-accent-bright: var(--gg-candy-blue);
 
   --gg-color-success: var(--gg-green-500);

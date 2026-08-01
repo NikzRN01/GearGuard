@@ -46,13 +46,20 @@
 }
 
 .auth-brand-panel {
+  --gg-color-text: #f2f6f7;
+  --gg-color-text-secondary: #c5d0d4;
+  --gg-color-text-muted: #91a1a8;
+  --gg-color-border: #273238;
+  --gg-color-border-strong: #52656e;
+  --gg-color-primary-text: var(--gg-candy-blue);
+  --gg-color-accent: var(--gg-candy-blue);
   display: flex;
   min-height: 610px;
   flex-direction: column;
   justify-content: space-between;
   gap: var(--gg-space-8);
   padding: clamp(32px, 5vw, 58px);
-  background: linear-gradient(160deg, var(--gg-navy-850), var(--gg-navy-950));
+  background: linear-gradient(160deg, #0b0e10, var(--gg-onyx));
   color: var(--gg-color-text);
 }
 
