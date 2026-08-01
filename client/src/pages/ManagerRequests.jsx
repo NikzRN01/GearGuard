@@ -11,6 +11,7 @@ import SelectMenu from '../components/ui/SelectMenu';
 import Field from '../components/ui/Field';
 import Input from '../components/ui/Input';
 import { formatTimestamp } from '../services/datetime';
+import { getSessionUser } from '../services/session';
 
 const CLOSED_STATUSES = new Set(['repaired', 'scrap', 'completed', 'closed']);
 const isOpen = (request) => !CLOSED_STATUSES.has(String(request.status || '').toLowerCase());
@@ -32,6 +33,7 @@ const formatSchedule = (value) => {
 };
 
 export default function ManagerRequests() {
+  const isAdmin = getSessionUser()?.role === 'admin';
   const navigate = useNavigate();
   const { requestId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -47,6 +49,9 @@ export default function ManagerRequests() {
   const [scheduleFeedback, setScheduleFeedback] = useState('');
   const [assigneeId, setAssigneeId] = useState('');
   const [scheduledDate, setScheduledDate] = useState('');
+  const [subject, setSubject] = useState('');
+  const [note, setNote] = useState('');
+  const [actionSaving, setActionSaving] = useState(false);
 
   const loadList = async () => {
     setLoading(true);
@@ -77,6 +82,7 @@ export default function ManagerRequests() {
       setDetail(request);
       setAssigneeId(request?.assigned_to_user_id ? String(request.assigned_to_user_id) : '');
       setScheduledDate(dateKey(request?.scheduled_date));
+      setSubject(request?.subject || '');
     } catch (err) {
       setDetail(null);
       setError(err?.response?.data?.message || 'Unable to load request details.');
@@ -140,13 +146,46 @@ export default function ManagerRequests() {
     } finally { setScheduleSaving(false); }
   };
 
+  const updateRequest = async () => {
+    if (!detail?.id || !subject.trim()) return;
+    setActionSaving(true); setError('');
+    try {
+      await api.put(`/maintenance/${detail.id}`, { type: detail.type, subject: subject.trim(), equipment_id: detail.equipment_id || null, work_center_id: detail.work_center_id || null, scheduled_date: scheduledDate || null, duration_hours: detail.duration_hours ?? null });
+      await Promise.all([loadDetail(detail.id), loadList()]);
+    } catch (err) { setError(err?.response?.data?.message || 'Unable to update the request.'); }
+    finally { setActionSaving(false); }
+  };
+
+  const updateStatus = async (status) => {
+    setActionSaving(true); setError('');
+    try { await api.patch(`/maintenance/${detail.id}/status`, { status }); await Promise.all([loadDetail(detail.id), loadList()]); }
+    catch (err) { setError(err?.response?.data?.message || 'Unable to update request status.'); }
+    finally { setActionSaving(false); }
+  };
+
+  const addNote = async () => {
+    if (!note.trim()) return;
+    setActionSaving(true); setError('');
+    try { await api.post(`/maintenance/${detail.id}/notes`, { message: note.trim() }); setNote(''); await loadDetail(detail.id); }
+    catch (err) { setError(err?.response?.data?.message || 'Unable to add the note.'); }
+    finally { setActionSaving(false); }
+  };
+
+  const deleteRequest = async () => {
+    if (!window.confirm(`Delete request #${detail.id}? This cannot be undone.`)) return;
+    setActionSaving(true); setError('');
+    try { await api.delete(`/maintenance/${detail.id}`); navigate('/app/manager/requests'); await loadList(); }
+    catch (err) { setError(err?.response?.data?.message || 'Unable to delete the request.'); }
+    finally { setActionSaving(false); }
+  };
+
   return (
     <div className="container manager-page">
       <PageHeader
-        eyebrow="Manager workspace"
+        eyebrow={isAdmin ? 'Admin operations' : 'Manager workspace'}
         title="Requests"
         description="Review, assign, and schedule maintenance work."
-        actions={<Button as="link" variant="secondary" to="/app/manager/overview">Back to overview</Button>}
+        actions={<><Button as="link" to="/app/requests" state={{ openNew: true }}>Create request</Button><Button as="link" variant="secondary" to={isAdmin ? '/app/admin' : '/app/manager/overview'}>Back to overview</Button></>}
       />
 
       <div className="manager-filter-bar" aria-label="Request filters">
@@ -193,6 +232,12 @@ export default function ManagerRequests() {
                 <div><dt>Reported by</dt><dd>{detail.created_by_name || 'Unknown'}</dd></div>
               </dl>
 
+              <div className="manager-form-section" aria-busy={actionSaving}>
+                <div><h3>Request controls</h3><p>Edit the request, advance its workflow, or remove it.</p></div>
+                <Field label="Subject"><Input value={subject} onChange={(event) => setSubject(event.target.value)} /></Field>
+                <div className="manager-inline-actions"><Button pending={actionSaving} pendingLabel="Saving..." disabled={!subject.trim() || subject.trim() === detail.subject} onClick={updateRequest}>Save request</Button>{detail.status === 'new' && <Button variant="secondary" onClick={() => updateStatus('in_progress')}>Start work</Button>}{['new', 'in_progress'].includes(detail.status) && <Button variant="secondary" onClick={() => updateStatus('scrap')}>Mark scrapped</Button>}{detail.status === 'in_progress' && <Button variant="secondary" onClick={() => updateStatus('repaired')}>Mark repaired</Button>}<Button variant="danger" onClick={deleteRequest}>Delete request</Button></div>
+              </div>
+
               <div className="manager-form-section" aria-busy={assignmentSaving}>
                 <div><h3>Assignment</h3><p>The API validates team eligibility for technicians.</p></div>
                 <Field label="Technician or manager"><select value={assigneeId} onChange={(event) => setAssigneeId(event.target.value)}><option value="">Select an assignee</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name} · {user.role}</option>)}</select></Field>
@@ -209,6 +254,7 @@ export default function ManagerRequests() {
 
               <div className="manager-history">
                 <h3>Notes</h3>
+                <div className="manager-note-composer"><Input value={note} onChange={(event) => setNote(event.target.value)} placeholder="Add an operational note" /><Button variant="secondary" pending={actionSaving} pendingLabel="Adding..." disabled={!note.trim()} onClick={addNote}>Add note</Button></div>
                 {detail.notes?.length ? detail.notes.map((note) => <article key={note.id}><p>{note.message}</p><time>{formatTimestamp(note.created_at, '')}</time></article>) : <EmptyState compact title="No notes yet" description="Notes added to this request will appear here." />}
               </div>
             </>

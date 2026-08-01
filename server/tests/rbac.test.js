@@ -87,7 +87,7 @@ test('state-changing requests require CSRF token', async () => {
   assert.equal(response.status, 403);
 });
 
-test('administrators can access governance data but not manager operations', async () => {
+test('administrators can access governance data and all manager operations', async () => {
   const admin = await login('admin@demo.com', 'admin');
   const overviewResponse = await fetch(`${baseUrl}/admin/overview`, { headers: { Cookie: admin.cookie } });
   assert.equal(overviewResponse.status, 200);
@@ -95,8 +95,17 @@ test('administrators can access governance data but not manager operations', asy
   const usersResponse = await fetch(`${baseUrl}/admin/users`, { headers: { Cookie: admin.cookie } });
   assert.equal(usersResponse.status, 200);
 
-  const operationsResponse = await fetch(`${baseUrl}/maintenance`, { headers: { Cookie: admin.cookie } });
-  assert.equal(operationsResponse.status, 403);
+  for (const path of ['/maintenance', '/equipment', '/teams', '/teams/users/all', '/work-centers']) {
+    const operationsResponse = await fetch(`${baseUrl}${path}`, { headers: { Cookie: admin.cookie } });
+    assert.equal(operationsResponse.status, 200, `${path} should be available to administrators`);
+  }
+
+  const createTeamResponse = await fetch(`${baseUrl}/teams`, {
+    method: 'POST',
+    headers: { Cookie: admin.cookie, 'X-CSRF-Token': admin.csrfToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: `Admin operations ${Date.now()}` })
+  });
+  assert.equal(createTeamResponse.status, 201);
 
   const selfRoleResponse = await fetch(`${baseUrl}/admin/users/${admin.user.id}/role`, {
     method: 'PATCH',

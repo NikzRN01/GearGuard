@@ -2,6 +2,9 @@
 
 The API session is the only authority for identity and role. Client-provided user IDs never establish ownership.
 
+Administrators are the super-role: they retain exclusive governance access and
+also inherit every operational capability available to managers.
+
 | Capability | User | Technician | Manager | Admin |
 |---|---:|---:|---:|---:|
 | Read equipment and work-center reference data | Yes | Yes | Yes | Yes |
@@ -15,6 +18,8 @@ The API session is the only authority for identity and role. Client-provided use
 | Read teams and members | Yes | Yes | Yes | Yes |
 | Enumerate all eligible users | No | No | Yes | Yes |
 | Manage teams, equipment, and work centers | No | No | Yes | Yes |
+| View administration overview and audit log | No | No | No | Yes |
+| Change non-admin user roles | No | No | No | Yes |
 
 ## Session security
 

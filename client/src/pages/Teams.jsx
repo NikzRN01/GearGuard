@@ -98,6 +98,41 @@ export default function Teams() {
         setShowForm(true);
     }
 
+    async function renameTeam(team) {
+        const name = window.prompt('Enter the new team name', team.name);
+        if (!name?.trim() || name.trim() === team.name) return;
+        setError('');
+        try {
+            await api.put(`/teams/${team.id}`, { name: name.trim() });
+            await fetchTeams();
+        } catch (err) {
+            setError(err?.response?.data?.message || 'Unable to rename the team.');
+        }
+    }
+
+    async function deleteTeam(team) {
+        if (!window.confirm(`Delete ${team.name}? This only succeeds when nothing references the team.`)) return;
+        setError('');
+        try {
+            await api.delete(`/teams/${team.id}`);
+            await fetchTeams();
+        } catch (err) {
+            setError(err?.response?.data?.message || 'Unable to delete the team.');
+        }
+    }
+
+    async function removeMember(member) {
+        if (!selectedTeam || !window.confirm(`Remove ${member.name} from ${selectedTeam.name}?`)) return;
+        setMemberError('');
+        try {
+            await api.delete(`/teams/${selectedTeam.id}/members/${member.id}`);
+            await fetchTeams();
+            setSelectedTeam((team) => ({ ...team, members: team.members.filter((item) => item.id !== member.id) }));
+        } catch (err) {
+            setMemberError(err?.response?.data?.message || 'Unable to remove the team member.');
+        }
+    }
+
     function closeNew() {
         setShowForm(false);
     }
@@ -165,7 +200,7 @@ export default function Teams() {
 
     return (
         <div className="container manager-page manager-teams-page">
-            <PageHeader eyebrow={canManageTeams ? 'Manager workspace' : 'Team reference'} title="Teams" description={canManageTeams ? 'Manage maintenance teams and their members.' : 'Review maintenance teams and their members.'} actions={<>{canManageTeams && <Button onClick={openNew}>Create team</Button>}<Button variant="secondary" onClick={fetchTeams} disabled={loading}>{loading ? 'Refreshing...' : 'Refresh'}</Button></>} />
+            <PageHeader eyebrow={currentUser?.role === 'admin' ? 'Admin operations' : canManageTeams ? 'Manager workspace' : 'Team reference'} title="Teams" description={canManageTeams ? 'Manage maintenance teams and their members.' : 'Review maintenance teams and their members.'} actions={<>{canManageTeams && <Button onClick={openNew}>Create team</Button>}<Button variant="secondary" onClick={fetchTeams} disabled={loading}>{loading ? 'Refreshing...' : 'Refresh'}</Button></>} />
 
             {error && <Alert tone="danger" title="Teams could not be loaded" action={<Button variant="secondary" size="small" onClick={fetchTeams}>Try again</Button>}>{error}</Alert>}
 
@@ -191,7 +226,7 @@ export default function Teams() {
                                     }
                                 </td>
                                 <td className="manager-team-action">
-                                    {canManageTeams ? <Button variant="secondary" size="small" onClick={() => openAddMember(r)}>Add member</Button> : <span className="manager-muted-cell">View only</span>}
+                                    {canManageTeams ? <div className="manager-inline-actions"><Button variant="secondary" size="small" onClick={() => openAddMember(r)}>Members</Button><Button variant="tertiary" size="small" onClick={() => renameTeam(r)}>Rename</Button><Button variant="danger" size="small" onClick={() => deleteTeam(r)}>Delete</Button></div> : <span className="manager-muted-cell">View only</span>}
                                 </td>
                             </tr>
                         ))}
@@ -239,6 +274,10 @@ export default function Teams() {
                     <div className="modal-content manager-teams-modal" role="dialog" aria-modal="true" aria-labelledby="add-member-title" onMouseDown={(e) => e.stopPropagation()}>
                         <h3 id="add-member-title">Add member to {selectedTeam?.name}</h3>
                         <p>Select a user to add to this team.</p>
+
+                        {selectedTeam?.members?.length > 0 && <div className="manager-member-list" aria-label="Current team members">
+                            {selectedTeam.members.map((member) => <div key={member.id}><span>{member.name}<small>{member.email || member.role}</small></span><Button type="button" variant="tertiary" size="small" onClick={() => removeMember(member)}>Remove</Button></div>)}
+                        </div>}
 
                         <form onSubmit={onAddMember}>
                             <div className="input-group">

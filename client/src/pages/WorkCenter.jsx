@@ -6,13 +6,17 @@ import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
 import PageHeader from '../components/ui/PageHeader';
 import Panel from '../components/ui/Panel';
+import { getSessionUser } from '../services/session';
 
 export default function WorkCenter() {
+    const currentUser = getSessionUser();
+    const canManage = ['manager', 'admin'].includes(currentUser?.role);
     const [rows, setRows] = useState([]);
     const [altMap, setAltMap] = useState({});
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [showNew, setShowNew] = useState(false);
+    const [editingId, setEditingId] = useState(null);
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState('');
     const [formSuccess, setFormSuccess] = useState('');
@@ -59,6 +63,7 @@ export default function WorkCenter() {
     }, []);
 
     const openNew = () => {
+        setEditingId(null);
         setFormError('');
         setFormSuccess('');
         setForm({
@@ -70,6 +75,18 @@ export default function WorkCenter() {
             time_efficiency_pct: '100',
             oee_target_pct: '0',
             alternative_ids: []
+        });
+        setShowNew(true);
+    };
+
+    const openEdit = (wc) => {
+        setEditingId(wc.id);
+        setFormError(''); setFormSuccess('');
+        setForm({
+            name: wc.name || '', code: wc.code || '', tag: wc.tag || '',
+            cost_per_hour: String(wc.cost_per_hour ?? 0), capacity_per_hour: String(wc.capacity_per_hour ?? 0),
+            time_efficiency_pct: String(wc.time_efficiency_pct ?? 100), oee_target_pct: String(wc.oee_target_pct ?? 0),
+            alternative_ids: (altMap[wc.id] || []).map((item) => String(item.alt_id))
         });
         setShowNew(true);
     };
@@ -118,22 +135,23 @@ export default function WorkCenter() {
                 oee_target_pct: Number(form.oee_target_pct),
                 status: 'active'
             };
-            const { data } = await api.post('/work-centers', payload);
+            const { data } = editingId ? await api.put(`/work-centers/${editingId}`, payload) : await api.post('/work-centers', payload);
             if (data?.success) {
-                const newId = data?.data?.id;
+                const newId = editingId || data?.data?.id;
                 const selectedAltIds = Array.from(new Set(form.alternative_ids || []))
                     .map((v) => Number(v))
                     .filter((n) => Number.isFinite(n));
 
-                if (newId && selectedAltIds.length) {
-                    await Promise.all(
-                        selectedAltIds.map((altId) =>
-                            api.post(`/work-centers/${newId}/alternatives`, { alternative_work_center_id: altId })
-                        )
-                    );
+                if (editingId) {
+                    const existing = altMap[editingId] || [];
+                    const currentIds = existing.map((item) => Number(item.alt_id));
+                    await Promise.all(existing.filter((item) => !selectedAltIds.includes(Number(item.alt_id))).map((item) => api.delete(`/work-centers/${editingId}/alternatives/${item.id}`)));
+                    await Promise.all(selectedAltIds.filter((id) => !currentIds.includes(id)).map((id) => api.post(`/work-centers/${editingId}/alternatives`, { alternative_work_center_id: id })));
+                } else if (newId && selectedAltIds.length) {
+                    await Promise.all(selectedAltIds.map((altId) => api.post(`/work-centers/${newId}/alternatives`, { alternative_work_center_id: altId })));
                 }
 
-                setFormSuccess('Work center created successfully');
+                setFormSuccess(editingId ? 'Work center updated successfully' : 'Work center created successfully');
                 await load();
                 setTimeout(() => closeNew(), 600);
             } else {
@@ -146,14 +164,21 @@ export default function WorkCenter() {
         }
     };
 
+    const deactivate = async (wc) => {
+        if (!window.confirm(`Deactivate ${wc.name}?`)) return;
+        setError('');
+        try { await api.delete(`/work-centers/${wc.id}`); await load(); }
+        catch (err) { setError(err?.response?.data?.message || 'Unable to deactivate work center.'); }
+    };
+
     return (
         <div className="container manager-page manager-workcenter-page">
-            <PageHeader eyebrow="Manager workspace" title="Work centers" description="Manage operational work centers, capacity settings, and alternatives." actions={<><Button onClick={openNew}>Add work center</Button><Button variant="secondary" onClick={load} disabled={loading}>{loading ? 'Refreshing...' : 'Refresh'}</Button></>} />
+            <PageHeader eyebrow={currentUser?.role === 'admin' ? 'Admin operations' : canManage ? 'Manager workspace' : 'Operations reference'} title="Work centers" description={canManage ? 'Manage operational work centers, capacity settings, and alternatives.' : 'Review operational work centers and capacity settings.'} actions={<>{canManage && <Button onClick={openNew}>Add work center</Button>}<Button variant="secondary" onClick={load} disabled={loading}>{loading ? 'Refreshing...' : 'Refresh'}</Button></>} />
 
             {error && <Alert tone="danger" title="Work centers could not be loaded" action={<Button variant="secondary" size="small" onClick={load}>Try again</Button>}>{error}</Alert>}
 
             {!error && <Panel eyebrow="Operations" title={`${rows.length} work centers`} ariaLabel="Work centers">
-                {loading ? <div className="manager-state" role="status">Loading work centers...</div> : rows.length === 0 ? <EmptyState title="No work centers yet" description="Create the first work center to make it available in maintenance workflows." action={<Button onClick={openNew}>Add work center</Button>} /> : <div className="table-wrap">
+                {loading ? <div className="manager-state" role="status">Loading work centers...</div> : rows.length === 0 ? <EmptyState title="No work centers yet" description="Create the first work center to make it available in maintenance workflows." action={canManage ? <Button onClick={openNew}>Add work center</Button> : null} /> : <div className="table-wrap">
                 <table className="table manager-workcenter-table">
                     <thead>
                         <tr>
@@ -165,6 +190,7 @@ export default function WorkCenter() {
                             <th className="manager-number-cell">Capacity</th>
                             <th className="manager-number-cell">Time efficiency</th>
                             <th className="manager-number-cell">OEE target</th>
+                            {canManage && <th>Actions</th>}
                         </tr>
                     </thead>
                     <tbody>
@@ -182,6 +208,7 @@ export default function WorkCenter() {
                                 <td data-label="Capacity" className="manager-number-cell">{Number(wc.capacity_per_hour ?? 0).toFixed(2)}</td>
                                 <td data-label="Time efficiency" className="manager-number-cell">{Number(wc.time_efficiency_pct ?? 100).toFixed(2)}%</td>
                                 <td data-label="OEE target" className="manager-number-cell">{Number(wc.oee_target_pct ?? 0).toFixed(2)}%</td>
+                                {canManage && <td data-label="Actions"><div className="manager-inline-actions"><Button variant="tertiary" size="small" onClick={() => openEdit(wc)}>Edit</Button><Button variant="danger" size="small" onClick={() => deactivate(wc)}>Deactivate</Button></div></td>}
                             </tr>
                         ))}
                     </tbody>
@@ -194,8 +221,8 @@ export default function WorkCenter() {
                 createPortal(
                     <div className="modal-overlay manager-workcenter-overlay" role="dialog" aria-modal="true" aria-label="Create work center">
                         <div className="modal-content manager-workcenter-modal">
-                            <h3>Create Work Center</h3>
-                            <p>Add the operational values used when planning and assigning maintenance work.</p>
+                            <h3>{editingId ? 'Edit Work Center' : 'Create Work Center'}</h3>
+                            <p>{editingId ? 'Update operational values and alternative work centers.' : 'Add the operational values used when planning and assigning maintenance work.'}</p>
                             <form onSubmit={submitNew}>
                                 <div className="input-group">
                                     <label>Work Center Name</label>
@@ -291,7 +318,7 @@ export default function WorkCenter() {
                                                 updateForm('alternative_ids', selected);
                                             }}
                                         >
-                                            {rows.map((wc) => (
+                                            {rows.filter((wc) => wc.id !== editingId).map((wc) => (
                                                 <option key={wc.id} value={String(wc.id)}>
                                                     {wc.name}{wc.code ? ` (${wc.code})` : ''}
                                                 </option>
@@ -308,7 +335,7 @@ export default function WorkCenter() {
 
                                 <div className="modal-actions manager-workcenter-modal-actions">
                                     <Button type="button" variant="secondary" onClick={closeNew} disabled={saving}>Cancel</Button>
-                                    <Button type="submit" pending={saving} pendingLabel="Creating...">Create work center</Button>
+                                    <Button type="submit" pending={saving} pendingLabel="Saving...">{editingId ? 'Save changes' : 'Create work center'}</Button>
                                 </div>
                             </form>
                         </div>

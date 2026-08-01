@@ -20,8 +20,9 @@ const { authorize, audit } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Admins are governance-only: they read reports, they do not run operations.
-router.use(authorize('user', 'technician', 'manager'));
+// Administrators are a super-role: governance access plus every operational
+// capability available to managers.
+router.use(authorize('user', 'technician', 'manager', 'admin'));
 
 const TYPES = ['corrective', 'preventive'];
 const STATUSES = ['new', 'in_progress', 'repaired', 'scrap'];

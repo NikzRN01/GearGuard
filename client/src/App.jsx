@@ -159,6 +159,13 @@ export default function App() {
             <NavLink to="/app/admin" end>Control Center</NavLink>
             <p className="manager-sidebar__group-label">Governance</p>
             <NavLink to="/app/admin/users">User Access</NavLink>
+            <p className="manager-sidebar__group-label">Operations</p>
+            <NavLink to="/app/manager/requests">Requests</NavLink>
+            <NavLink to="/app/manager/schedule">Schedule</NavLink>
+            <NavLink to="/app/manager/workload">Team Workload</NavLink>
+            <NavLink to="/app/equipment/machine-tools">Equipment</NavLink>
+            <NavLink to="/app/equipment/work-center">Work Centers</NavLink>
+            <NavLink to="/app/teams">Teams</NavLink>
           </>
         ) : (
           <>

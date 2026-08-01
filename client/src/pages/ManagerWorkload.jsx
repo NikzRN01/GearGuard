@@ -5,10 +5,12 @@ import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
 import PageHeader from '../components/ui/PageHeader';
 import Panel from '../components/ui/Panel';
+import { getSessionUser } from '../services/session';
 
 const closed = new Set(['repaired', 'scrap', 'completed', 'closed']);
 
 export default function ManagerWorkload() {
+  const isAdmin = getSessionUser()?.role === 'admin';
   const [requests, setRequests] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +37,7 @@ export default function ManagerWorkload() {
 
   return (
     <div className="container manager-page">
-      <PageHeader eyebrow="Manager workspace" title="Assigned workload" description="Active request counts by eligible technician and manager." actions={<><Button variant="secondary" onClick={load}>Refresh</Button><Button as="link" variant="secondary" to="/app/manager/overview">Back to overview</Button></>} />
+      <PageHeader eyebrow={isAdmin ? 'Admin operations' : 'Manager workspace'} title="Assigned workload" description="Active request counts by eligible technician and manager." actions={<><Button variant="secondary" onClick={load}>Refresh</Button><Button as="link" variant="secondary" to={isAdmin ? '/app/admin' : '/app/manager/overview'}>Back to overview</Button></>} />
       <Alert tone="info" title="What these counts mean">This view shows assigned requests, not capacity or utilization. Shifts and estimated hours are not available in the current API.</Alert>
       {error && <Alert tone="danger" title="Workload could not be loaded" action={<Button variant="secondary" size="small" onClick={load}>Try again</Button>}>{error}</Alert>}
       {!error && <Panel eyebrow="Team" title={`${rows.length} eligible team members`} ariaLabel="Assigned workload by team member">

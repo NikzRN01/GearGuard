@@ -58,10 +58,10 @@ describe('App navigation', () => {
     ]);
   });
 
-  it('keeps an administrator on governance pages only', () => {
+  it('gives an administrator governance and full operational navigation', () => {
     signIn('admin');
     renderShell();
-    expect(navLinks()).toEqual(['Control Center', 'User Access']);
+    expect(navLinks()).toEqual(['Control Center', 'User Access', 'Requests', 'Schedule', 'Team Workload', 'Equipment', 'Work Centers', 'Teams']);
     expect(screen.getByText('System administrator')).toBeInTheDocument();
   });
 

@@ -4,8 +4,10 @@ import Alert from '../components/ui/Alert';
 import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
 import PageHeader from '../components/ui/PageHeader';
+import { getSessionUser } from '../services/session';
 
 export default function Calendar() {
+	const isAdmin = getSessionUser()?.role === 'admin';
 	const [currentDate, setCurrentDate] = useState(new Date());
 	const [view, setView] = useState('week');
 	const [loading, setLoading] = useState(false);
@@ -196,7 +198,7 @@ export default function Calendar() {
 	return (
 		<div className="container manager-page manager-schedule-page">
 			<PageHeader
-				eyebrow="Manager workspace"
+				eyebrow={isAdmin ? 'Admin operations' : 'Manager workspace'}
 				title="Maintenance schedule"
 				description="Review scheduled maintenance work by date."
 				actions={<div className="calendar-controls" aria-label="Schedule navigation">

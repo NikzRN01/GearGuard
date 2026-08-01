@@ -305,6 +305,62 @@
 
 .gg-button--tertiary:hover:not(:disabled) { background: var(--gg-color-primary-soft); }
 
+.gg-button--danger {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #9f1239;
+}
+
+.gg-button--danger:hover:not(:disabled) {
+  background: #ffe4e6;
+  border-color: #fda4af;
+}
+
+.manager-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.manager-member-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1rem 0;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.manager-member-list > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--gg-color-border);
+  border-radius: var(--gg-radius-md);
+}
+
+.manager-member-list span { display: grid; }
+.manager-member-list small { color: var(--gg-color-text-muted); }
+
+.manager-note-composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.manager-equipment-modal {
+  width: min(760px, calc(100vw - 2rem));
+  max-height: min(820px, calc(100vh - 2rem));
+  overflow-y: auto;
+}
+
+@media (max-width: 640px) {
+  .manager-note-composer { grid-template-columns: 1fr; }
+}
+
 .gg-button:disabled {
   cursor: not-allowed;
   opacity: 0.55;

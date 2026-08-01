@@ -15,8 +15,9 @@ const { authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Admins are governance-only: they read reports, they do not run operations.
-router.use(authorize('user', 'technician', 'manager'));
+// Administrators are a super-role: governance access plus every operational
+// capability available to managers.
+router.use(authorize('user', 'technician', 'manager', 'admin'));
 
 const findTeam = (rawId) => {
   const id = toId(rawId);
@@ -27,7 +28,7 @@ const findTeam = (rawId) => {
 };
 
 // Get all users (for team member assignment)
-router.get('/users/all', authorize('manager'), route((req, res) => {
+router.get('/users/all', authorize('manager', 'admin'), route((req, res) => {
   const users = db.prepare(`
     SELECT
       id,

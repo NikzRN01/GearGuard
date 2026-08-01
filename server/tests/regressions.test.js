@@ -333,23 +333,22 @@ test('technicians and managers still see member contact details', async () => {
   }
 });
 
-test('the manager-only user directory stays manager-only', async () => {
+test('the operational user directory is restricted to managers and administrators', async () => {
   const requester = await h.as('user');
   const technician = await h.as('technician');
   assert.equal((await requester.get('/api/teams/users/all')).status, 403);
   assert.equal((await technician.get('/api/teams/users/all')).status, 403);
   assert.equal((await (await h.manager()).get('/api/teams/users/all')).status, 200);
+  assert.equal((await (await h.as('admin')).get('/api/teams/users/all')).status, 200);
 });
 
 /* ------------------------------------------------------------------- roles */
 
-test('an administrator is governance-only and cannot reach operational data', async () => {
-  // Deliberate: the admin console reads /api/admin. This pins the contract so a
-  // future change to the router guards cannot silently widen it.
+test('an administrator can reach governance and all operational data', async () => {
   const admin = await h.as('admin');
   for (const path of ['/api/maintenance', '/api/equipment', '/api/teams', '/api/work-centers']) {
     const res = await admin.get(path);
-    assert.equal(res.status, 403, `${path} should be closed to admins, got ${res.status}`);
+    assert.equal(res.status, 200, `${path} should be available to admins, got ${res.status}`);
   }
   assert.equal((await admin.get('/api/admin/overview')).status, 200, 'the admin console must still work');
 });
