@@ -125,9 +125,14 @@ body {
   box-shadow: 0 18px 38px rgba(11, 47, 64, 0.1);
 }
 
-:root[data-theme='light'] .landing-metric-card h3,
-:root[data-theme='light'] .metric-value {
-  color: var(--gg-blue-800);
+.landing-metric-card h3 {
+  color: var(--gg-color-primary-text);
+  font-weight: 800;
+}
+
+.metric-value {
+  color: var(--gg-color-text);
+  letter-spacing: -0.025em;
 }
 
 :root[data-theme='light'] .landing-feature-icon,
