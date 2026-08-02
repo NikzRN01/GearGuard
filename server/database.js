@@ -370,6 +370,124 @@ const seedDemoData = () => {
   }
 };
 
+// A richer development-only dataset for visually exercising every operational
+// field and state. Stable natural keys plus INSERT OR IGNORE keep this safe to
+// run on every local boot without duplicating records.
+const seedShowcaseData = () => {
+  if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'production') return;
+  if (String(process.env.SEED_SHOWCASE_DATA || 'true').toLowerCase() === 'false') return;
+
+  const passwordHash = bcrypt.hashSync('Password123!', 10);
+  const insertUser = db.prepare(`
+    INSERT OR IGNORE INTO users (name, email, password, role, avatar_url)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  insertUser.run('Priya Sharma', 'priya.tech@demo.com', passwordHash, 'technician', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330');
+  insertUser.run('Noah Williams', 'noah.user@demo.com', passwordHash, 'user', 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e');
+
+  const avatars = [
+    ['manager@demo.com', 'https://images.unsplash.com/photo-1560250097-0b93528c311a'],
+    ['tech1@demo.com', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e'],
+    ['tech2@demo.com', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d'],
+    ['admin@demo.com', 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7'],
+    ['user@demo.com', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb']
+  ];
+  const setAvatar = db.prepare('UPDATE users SET avatar_url = COALESCE(avatar_url, ?) WHERE email = ?');
+  for (const [email, avatar] of avatars) setAvatar.run(avatar, email);
+
+  const insertTeam = db.prepare('INSERT OR IGNORE INTO teams (name) VALUES (?)');
+  ['Facilities Response', 'Electrical Reliability'].forEach((name) => insertTeam.run(name));
+  const teamByName = Object.fromEntries(db.prepare('SELECT id, name FROM teams').all().map((row) => [row.name, row.id]));
+  const userByEmail = Object.fromEntries(db.prepare('SELECT id, email FROM users').all().map((row) => [row.email, row.id]));
+
+  const addMember = db.prepare('INSERT OR IGNORE INTO team_members (team_id, user_id) VALUES (?, ?)');
+  addMember.run(teamByName['Internal Maintenance'], userByEmail['priya.tech@demo.com']);
+  addMember.run(teamByName['Facilities Response'], userByEmail['manager@demo.com']);
+  addMember.run(teamByName['Facilities Response'], userByEmail['tech1@demo.com']);
+  addMember.run(teamByName['Electrical Reliability'], userByEmail['tech2@demo.com']);
+  addMember.run(teamByName['Electrical Reliability'], userByEmail['priya.tech@demo.com']);
+
+  const insertWorkCenter = db.prepare(`
+    INSERT OR IGNORE INTO work_centers
+      (name, code, tag, cost_per_hour, capacity_per_hour, time_efficiency_pct, oee_target_pct, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  insertWorkCenter.run('Assembly Line 1', 'WC-ASM-01', 'assembly', 1850.5, 24, 92.5, 88, 'active');
+  insertWorkCenter.run('Precision Lab', 'WC-MET-02', 'metrology', 2650, 8, 97, 93.5, 'active');
+  insertWorkCenter.run('Legacy Paint Booth', 'WC-PNT-OLD', 'coating', 975.75, 5, 68, 72, 'inactive');
+  const workCenterByName = Object.fromEntries(db.prepare('SELECT id, name FROM work_centers').all().map((row) => [row.name, row.id]));
+  const addAlternative = db.prepare(`
+    INSERT OR IGNORE INTO work_center_alternatives (work_center_id, alternative_work_center_id)
+    VALUES (?, ?)
+  `);
+  addAlternative.run(workCenterByName['Assembly Line 1'], workCenterByName['Precision Lab']);
+  addAlternative.run(workCenterByName['Precision Lab'], workCenterByName['Assembly Line 1']);
+
+  const insertEquipment = db.prepare(`
+    INSERT OR IGNORE INTO equipment
+      (name, serial_number, category, department, assigned_employee_name, purchase_date,
+       warranty_end_date, location, maintenance_team_id, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  insertEquipment.run('CNC Milling Machine', 'CNC-5AX-0042', 'Production Machinery', 'Manufacturing', 'Aarav Mehta', '2023-03-15', '2028-03-14', 'Plant A · Bay 04', teamByName['Internal Maintenance'], 'active');
+  insertEquipment.run('Hydraulic Press 20T', 'HPR-20T-0187', 'Hydraulics', 'Fabrication', 'Maya Singh', '2019-08-01', '2022-07-31', 'Plant B · Press Zone', teamByName['Facilities Response'], 'maintenance');
+  insertEquipment.run('Digital Calibrator', 'CAL-DIG-0098', 'Measurement', 'Quality Assurance', 'Priya Sharma', '2025-01-12', '2027-01-11', 'Precision Lab · Cabinet 3', teamByName['Electrical Reliability'], 'active');
+  insertEquipment.run('Retired Air Compressor', 'CMP-AIR-0007', 'Utilities', 'Facilities', 'Unassigned', '2012-05-20', '2015-05-19', 'Storage Yard · Row C', null, 'retired');
+  const equipmentBySerial = Object.fromEntries(db.prepare('SELECT id, serial_number FROM equipment').all().map((row) => [row.serial_number, row.id]));
+
+  const isoDate = (offsetDays) => {
+    const date = new Date();
+    date.setDate(date.getDate() + offsetDays);
+    return date.toISOString().slice(0, 10);
+  };
+  const insertRequest = db.prepare(`
+    INSERT INTO maintenance_requests
+      (type, subject, equipment_id, work_center_id, team_id, scheduled_date, status,
+       assigned_to_user_id, duration_hours, created_by_user_id, created_at, updated_at)
+    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', ?), datetime('now', ?)
+    WHERE NOT EXISTS (SELECT 1 FROM maintenance_requests WHERE subject = ?)
+  `);
+  const requestRows = [
+    ['corrective', 'CNC spindle vibration above threshold', equipmentBySerial['CNC-5AX-0042'], null, teamByName['Internal Maintenance'], isoDate(-2), 'new', null, null, userByEmail['user@demo.com'], '-3 days', '-3 days'],
+    ['preventive', 'Quarterly hydraulic pressure inspection', equipmentBySerial['HPR-20T-0187'], null, teamByName['Facilities Response'], isoDate(0), 'in_progress', userByEmail['tech1@demo.com'], 2.5, userByEmail['noah.user@demo.com'], '-5 days', '-2 hours'],
+    ['corrective', 'Assembly conveyor sensor intermittently failing', null, workCenterByName['Assembly Line 1'], teamByName['Electrical Reliability'], isoDate(2), 'in_progress', userByEmail['tech2@demo.com'], 1.25, userByEmail['manager@demo.com'], '-2 days', '-1 hour'],
+    ['preventive', 'Calibrator annual certification completed', equipmentBySerial['CAL-DIG-0098'], null, teamByName['Electrical Reliability'], isoDate(-7), 'repaired', userByEmail['priya.tech@demo.com'], 3.75, userByEmail['user@demo.com'], '-12 days', '-7 days'],
+    ['corrective', 'Legacy paint extraction motor beyond repair', null, workCenterByName['Legacy Paint Booth'], teamByName['Subcontractor'], isoDate(-14), 'scrap', userByEmail['tech1@demo.com'], 6, userByEmail['manager@demo.com'], '-20 days', '-14 days'],
+    ['preventive', 'Precision lab environmental validation', null, workCenterByName['Precision Lab'], teamByName['Metrology'], isoDate(7), 'new', userByEmail['priya.tech@demo.com'], 4, userByEmail['noah.user@demo.com'], '-1 day', '-1 day']
+  ];
+  for (const row of requestRows) insertRequest.run(...row, row[1]);
+
+  const requests = Object.fromEntries(db.prepare('SELECT id, subject FROM maintenance_requests').all().map((row) => [row.subject, row.id]));
+  const insertNote = db.prepare(`
+    INSERT INTO notes (request_id, message, created_at)
+    SELECT ?, ?, datetime('now', ?)
+    WHERE NOT EXISTS (SELECT 1 FROM notes WHERE request_id = ? AND message = ?)
+  `);
+  const notes = [
+    ['Quarterly hydraulic pressure inspection', 'Lockout/tagout completed. Pressure stabilized at 178 bar.', '-90 minutes'],
+    ['Assembly conveyor sensor intermittently failing', 'Replacement proximity sensor ordered; temporary bypass documented.', '-45 minutes'],
+    ['Calibrator annual certification completed', 'Certificate QA-2026-114 attached to the equipment record.', '-7 days'],
+    ['Legacy paint extraction motor beyond repair', 'Manager approved scrapping after vendor inspection.', '-14 days']
+  ];
+  for (const [subject, message, age] of notes) {
+    const requestId = requests[subject];
+    if (requestId) insertNote.run(requestId, message, age, requestId, message);
+  }
+
+  const adminId = userByEmail['admin@demo.com'];
+  const insertAudit = db.prepare(`
+    INSERT INTO audit_log (actor_user_id, action, resource_type, resource_id, metadata_json, created_at)
+    SELECT ?, ?, ?, ?, ?, datetime('now', ?)
+    WHERE NOT EXISTS (SELECT 1 FROM audit_log WHERE action = ? AND resource_id = ?)
+  `);
+  const auditRows = [
+    [adminId, 'admin.user.role.review', 'user', String(userByEmail['priya.tech@demo.com']), JSON.stringify({ role: 'technician', outcome: 'confirmed' }), '-30 minutes'],
+    [adminId, 'equipment.register.review', 'equipment', String(equipmentBySerial['CNC-5AX-0042']), JSON.stringify({ fieldsReviewed: 10, source: 'showcase-seed' }), '-2 hours'],
+    [userByEmail['manager@demo.com'], 'maintenance.request.assign', 'maintenance_request', String(requests['Assembly conveyor sensor intermittently failing']), JSON.stringify({ assignedTo: 'Anas Makari', team: 'Electrical Reliability' }), '-1 day']
+  ];
+  for (const row of auditRows) insertAudit.run(...row, row[1], row[3]);
+};
+
 // Initialize all tables
 const initializeDatabase = () => {
   createUsersTable();
@@ -389,6 +507,7 @@ const initializeDatabase = () => {
   // For older DBs only; most are handled by migrateMaintenanceRequestsTable()
   addWorkCenterIdColumn();
   seedDemoData();
+  seedShowcaseData();
   console.log('Database initialized successfully');
 };
 

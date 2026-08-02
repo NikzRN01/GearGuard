@@ -109,6 +109,27 @@ export default function ManagerRequests() {
     });
   }, [requests, searchParams]);
 
+  const requestStats = useMemo(() => {
+    const today = todayKey();
+    return {
+      all: requests.length,
+      unassigned: requests.filter((request) => isOpen(request) && !request.assigned_to_user_id).length,
+      overdue: requests.filter((request) => isOpen(request) && request.scheduled_date && dateKey(request.scheduled_date) < today).length,
+      inProgress: requests.filter((request) => request.status === 'in_progress').length
+    };
+  }, [requests]);
+
+  const activeFilterCount = ['search', 'status', 'view'].filter((key) => searchParams.get(key)).length;
+
+  const applyQuickView = (view) => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('view');
+    next.delete('status');
+    if (view === 'unassigned' || view === 'overdue') next.set('view', view);
+    if (view === 'in_progress') next.set('status', 'in_progress');
+    setSearchParams(next, { replace: true });
+  };
+
   const updateParam = (key, value) => {
     const next = new URLSearchParams(searchParams);
     if (value) next.set(key, value); else next.delete(key);
@@ -189,21 +210,31 @@ export default function ManagerRequests() {
       />
 
       <div className="manager-filter-bar" aria-label="Request filters">
+        <div className="manager-filter-heading"><div><span>Find maintenance work</span><small>{activeFilterCount ? `${activeFilterCount} active filter${activeFilterCount === 1 ? '' : 's'}` : 'Showing the full request queue'}</small></div></div>
         <Field label="Search"><Input type="search" value={searchParams.get('search') || ''} onChange={(event) => updateParam('search', event.target.value)} placeholder="Request, asset, team..." /></Field>
         <div className="manager-filter-field"><span>Status</span><SelectMenu ariaLabel="Filter by status" value={searchParams.get('status') || ''} onChange={(value) => updateParam('status', value)} options={[{ value: '', label: 'All statuses' }, { value: 'new', label: 'New' }, { value: 'in_progress', label: 'In progress' }, { value: 'repaired', label: 'Repaired' }, { value: 'scrap', label: 'Scrapped' }]} /></div>
         <div className="manager-filter-field"><span>Attention</span><SelectMenu ariaLabel="Filter by attention" value={searchParams.get('view') || ''} onChange={(value) => updateParam('view', value)} options={[{ value: '', label: 'All requests' }, { value: 'unassigned', label: 'Unassigned' }, { value: 'overdue', label: 'Overdue' }]} /></div>
-        <Button variant="secondary" onClick={() => setSearchParams({}, { replace: true })}>Clear filters</Button>
+        <Button variant="secondary" disabled={activeFilterCount === 0} onClick={() => setSearchParams({}, { replace: true })}>Clear filters</Button>
       </div>
+
+      <p className="manager-filter-results" role="status" aria-live="polite">{loading ? 'Loading request queue.' : `${filtered.length} request${filtered.length === 1 ? '' : 's'} shown.`}</p>
 
       {error && <Alert tone="danger" title="Request action failed">{error}</Alert>}
 
+      <nav className="manager-request-summary" aria-label="Request queue views">
+        <button type="button" aria-current={!searchParams.get('view') && !searchParams.get('status') ? 'page' : undefined} className={!searchParams.get('view') && !searchParams.get('status') ? 'active' : ''} onClick={() => applyQuickView('all')}><span>All requests</span><strong>{requestStats.all}</strong><small>Complete queue</small></button>
+        <button type="button" aria-current={searchParams.get('view') === 'unassigned' ? 'page' : undefined} className={searchParams.get('view') === 'unassigned' ? 'active attention' : ''} onClick={() => applyQuickView('unassigned')}><span>Needs owner</span><strong>{requestStats.unassigned}</strong><small>Ready to assign</small></button>
+        <button type="button" aria-current={searchParams.get('view') === 'overdue' ? 'page' : undefined} className={searchParams.get('view') === 'overdue' ? 'active danger' : ''} onClick={() => applyQuickView('overdue')}><span>Overdue</span><strong>{requestStats.overdue}</strong><small>Past planned date</small></button>
+        <button type="button" aria-current={searchParams.get('status') === 'in_progress' ? 'page' : undefined} className={searchParams.get('status') === 'in_progress' ? 'active progress' : ''} onClick={() => applyQuickView('in_progress')}><span>In progress</span><strong>{requestStats.inProgress}</strong><small>Work underway</small></button>
+      </nav>
+
       <div className={`manager-request-layout ${requestId ? 'has-selection' : ''}`}>
-        <Panel className="manager-list-panel" ariaLabel="Maintenance requests" eyebrow="Queue" title={`${filtered.length} requests`} action={<Button variant="tertiary" size="small" onClick={loadList}>Refresh</Button>}>
+        <Panel className="manager-list-panel" ariaLabel="Maintenance requests. Scrollable region." tabIndex="0" eyebrow="Queue" title={`${filtered.length} requests`} action={<Button variant="tertiary" size="small" onClick={loadList}>Refresh</Button>}>
           {loading ? <div className="manager-state" role="status">Loading requests...</div> : filtered.length === 0 ? <EmptyState compact tone="search" title="No matching requests" description="Change or clear the filters to see the full queue." /> : (
-            <div className="manager-request-stack manager-scroll-stack">
+            <ul className="manager-request-stack manager-scroll-stack" aria-label="Filtered maintenance requests">
               {filtered.map((request) => (
-                <button key={request.id} type="button" onClick={() => navigate(`/app/manager/requests/${request.id}?${searchParams.toString()}`)} className={`manager-request-row manager-request-button ${Number(requestId) === Number(request.id) ? 'selected' : ''}`}>
-                  <div><strong>{request.subject}</strong><span>{request.equipment_name || request.work_center_name || 'No asset'} · {request.assigned_to_name || 'Unassigned'}</span></div>
+                <li key={request.id}><button type="button" aria-pressed={Number(requestId) === Number(request.id)} aria-label={`Request ${request.id}: ${request.subject}. ${request.assigned_to_name || 'Unassigned'}. ${formatSchedule(request.scheduled_date)}.`} onClick={() => navigate(`/app/manager/requests/${request.id}?${searchParams.toString()}`)} className={`manager-request-row manager-request-button ${Number(requestId) === Number(request.id) ? 'selected' : ''}`}>
+                  <div className="manager-request-row__primary"><span className="manager-request-row__id">Request #{request.id}</span><strong>{request.subject}</strong><span className="manager-request-row__context">{request.equipment_name || request.work_center_name || 'No asset'} <i aria-hidden="true">·</i> {request.type || 'Unspecified type'}</span><span className={`manager-request-row__owner ${request.assigned_to_name ? '' : 'is-unassigned'}`}>{request.assigned_to_name || 'Unassigned'}</span></div>
                   <div className="manager-row-meta">
                     <div className="manager-row-badges">
                       <StatusBadge status={request.status || 'new'} />
@@ -212,13 +243,13 @@ export default function ManagerRequests() {
                     </div>
                     <span>{formatSchedule(request.scheduled_date)}</span>
                   </div>
-                </button>
+                </button></li>
               ))}
-            </div>
+            </ul>
           )}
         </Panel>
 
-        <Panel className="manager-detail-panel" ariaLabel="Selected request details">
+        <Panel className="manager-detail-panel" ariaLabel="Selected request details. Scrollable region." tabIndex="0">
           {!requestId ? <EmptyState tone="selection" title="Select a request" description="Choose an item from the queue to review, assign, or schedule it." /> : detailLoading ? <div className="manager-state" role="status">Loading request details...</div> : detail ? (
             <>
               <div className="manager-detail-heading"><div><p className="manager-eyebrow">Request #{detail.id}</p><h2>{detail.subject}</h2></div><StatusBadge status={detail.status || 'new'} /></div>
@@ -230,31 +261,35 @@ export default function ManagerRequests() {
                 <div><dt>Type</dt><dd>{detail.type || 'Not set'}</dd></div>
                 <div><dt>Team</dt><dd>{detail.team_name || 'Not set'}</dd></div>
                 <div><dt>Reported by</dt><dd>{detail.created_by_name || 'Unknown'}</dd></div>
+                <div><dt>Assigned to</dt><dd>{detail.assigned_to_name || 'Unassigned'}</dd></div>
+                <div><dt>Scheduled</dt><dd>{formatSchedule(detail.scheduled_date)}</dd></div>
+                <div><dt>Duration</dt><dd>{detail.duration_hours != null ? `${detail.duration_hours} hours` : 'Not recorded'}</dd></div>
+                <div><dt>Created</dt><dd>{formatTimestamp(detail.created_at, 'Unknown')}</dd></div>
               </dl>
 
-              <div className="manager-form-section" aria-busy={actionSaving}>
-                <div><h3>Request controls</h3><p>Edit the request, advance its workflow, or remove it.</p></div>
-                <Field label="Subject"><Input value={subject} onChange={(event) => setSubject(event.target.value)} /></Field>
-                <div className="manager-inline-actions"><Button pending={actionSaving} pendingLabel="Saving..." disabled={!subject.trim() || subject.trim() === detail.subject} onClick={updateRequest}>Save request</Button>{detail.status === 'new' && <Button variant="secondary" onClick={() => updateStatus('in_progress')}>Start work</Button>}{['new', 'in_progress'].includes(detail.status) && <Button variant="secondary" onClick={() => updateStatus('scrap')}>Mark scrapped</Button>}{detail.status === 'in_progress' && <Button variant="secondary" onClick={() => updateStatus('repaired')}>Mark repaired</Button>}<Button variant="danger" onClick={deleteRequest}>Delete request</Button></div>
-              </div>
+              <form className="manager-form-section manager-form-section--controls" aria-busy={actionSaving} onSubmit={(event) => { event.preventDefault(); updateRequest(); }}>
+                <div className="manager-section-intro"><span className="manager-section-number" aria-hidden="true">01</span><div><h3>Request controls</h3><p>Edit the subject or advance this request through its workflow.</p></div></div>
+                <Field label="Subject" hint={!isOpen(detail) ? 'Closed requests cannot be edited.' : 'Press Enter to save a changed subject.'}><Input value={subject} disabled={!isOpen(detail) || actionSaving} onChange={(event) => setSubject(event.target.value)} /></Field>
+                <div className="manager-inline-actions manager-request-actions"><Button type="submit" pending={actionSaving} pendingLabel="Saving..." disabled={!isOpen(detail) || !subject.trim() || subject.trim() === detail.subject}>Save request</Button>{detail.status === 'new' && <Button disabled={actionSaving} onClick={() => updateStatus('in_progress')}>Start work</Button>}{['new', 'in_progress'].includes(detail.status) && <Button variant="secondary" disabled={actionSaving} onClick={() => updateStatus('scrap')}>Mark scrapped</Button>}{detail.status === 'in_progress' && <Button disabled={actionSaving} onClick={() => updateStatus('repaired')}>Mark repaired</Button>}<Button variant="danger" className="manager-delete-request" disabled={actionSaving} onClick={deleteRequest}>Delete request</Button></div>
+              </form>
 
-              <div className="manager-form-section" aria-busy={assignmentSaving}>
-                <div><h3>Assignment</h3><p>The API validates team eligibility for technicians.</p></div>
-                <Field label="Technician or manager"><select value={assigneeId} onChange={(event) => setAssigneeId(event.target.value)}><option value="">Select an assignee</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name} · {user.role}</option>)}</select></Field>
-                <Button pending={assignmentSaving} pendingLabel="Updating assignment..." disabled={!assigneeId || String(detail.assigned_to_user_id || '') === assigneeId} onClick={assign}>Update assignment</Button>
+              <form className="manager-form-section manager-form-section--assignment" aria-busy={assignmentSaving} onSubmit={(event) => { event.preventDefault(); assign(); }}>
+                <div className="manager-section-intro"><span className="manager-section-number" aria-hidden="true">02</span><div><h3>Assignment</h3><p>Route work to an eligible technician or manager.</p></div></div>
+                <Field label="Technician or manager" hint={!isOpen(detail) ? 'Closed requests cannot be reassigned.' : 'Press Enter to confirm the selected assignee.'}><select value={assigneeId} disabled={!isOpen(detail) || assignmentSaving} onChange={(event) => setAssigneeId(event.target.value)}><option value="">Select an assignee</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name} · {user.role}</option>)}</select></Field>
+                <Button type="submit" pending={assignmentSaving} pendingLabel="Updating assignment..." disabled={!isOpen(detail) || !assigneeId || String(detail.assigned_to_user_id || '') === assigneeId}>Update assignment</Button>
                 {assignmentFeedback && <p className="manager-form-feedback" role="status">{assignmentFeedback}</p>}
-              </div>
+              </form>
 
-              <div className="manager-form-section" aria-busy={scheduleSaving}>
-                <div><h3>Schedule</h3><p>The current API supports a date only; time and timezone scheduling remain backend-dependent.</p></div>
-                <Field label="Scheduled date"><Input type="date" value={scheduledDate} onChange={(event) => setScheduledDate(event.target.value)} /></Field>
-                <Button variant="secondary" pending={scheduleSaving} pendingLabel="Updating date..." disabled={dateKey(detail.scheduled_date) === scheduledDate} onClick={reschedule}>Update date</Button>
+              <form className="manager-form-section manager-form-section--schedule" aria-busy={scheduleSaving} onSubmit={(event) => { event.preventDefault(); reschedule(); }}>
+                <div className="manager-section-intro"><span className="manager-section-number" aria-hidden="true">03</span><div><h3>Schedule</h3><p>Set the planned work date. Time scheduling is not yet available.</p></div></div>
+                <Field label="Scheduled date" hint={!isOpen(detail) ? 'Closed requests cannot be rescheduled.' : 'Press Enter to confirm the date.'}><Input type="date" value={scheduledDate} disabled={!isOpen(detail) || scheduleSaving} onChange={(event) => setScheduledDate(event.target.value)} /></Field>
+                <Button type="submit" variant="secondary" pending={scheduleSaving} pendingLabel="Updating date..." disabled={!isOpen(detail) || dateKey(detail.scheduled_date) === scheduledDate}>Update date</Button>
                 {scheduleFeedback && <p className="manager-form-feedback" role="status">{scheduleFeedback}</p>}
-              </div>
+              </form>
 
               <div className="manager-history">
-                <h3>Notes</h3>
-                <div className="manager-note-composer"><Input value={note} onChange={(event) => setNote(event.target.value)} placeholder="Add an operational note" /><Button variant="secondary" pending={actionSaving} pendingLabel="Adding..." disabled={!note.trim()} onClick={addNote}>Add note</Button></div>
+                <div className="manager-section-intro"><span className="manager-section-number" aria-hidden="true">04</span><div><h3>Notes</h3><p>Keep a timestamped operational record for the team.</p></div></div>
+                <form className="manager-note-composer" onSubmit={(event) => { event.preventDefault(); addNote(); }}><Input aria-label="Operational note" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Add an operational note" /><Button type="submit" variant="secondary" pending={actionSaving} pendingLabel="Adding..." disabled={!note.trim()}>Add note</Button></form>
                 {detail.notes?.length ? detail.notes.map((note) => <article key={note.id}><p>{note.message}</p><time>{formatTimestamp(note.created_at, '')}</time></article>) : <EmptyState compact title="No notes yet" description="Notes added to this request will appear here." />}
               </div>
             </>

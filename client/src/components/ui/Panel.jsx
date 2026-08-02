@@ -1,8 +1,8 @@
 import React from 'react';
 
-export default function Panel({ title, eyebrow, action, children, className = '', ariaLabel }) {
+export default function Panel({ title, eyebrow, action, children, className = '', ariaLabel, ...props }) {
   return (
-    <section className={`gg-panel ${className}`} aria-label={ariaLabel}>
+    <section className={`gg-panel ${className}`} aria-label={ariaLabel} {...props}>
       {(title || eyebrow || action) && (
         <header className="gg-panel__header">
           <div>
@@ -16,4 +16,3 @@ export default function Panel({ title, eyebrow, action, children, className = ''
     </section>
   );
 }
-

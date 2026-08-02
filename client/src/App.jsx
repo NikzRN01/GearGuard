@@ -3,6 +3,7 @@ import { useTheme } from 'next-themes';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { getSessionUser } from './services/session';
 import { api } from './services/api';
+import { transitionTheme } from './services/theme';
 
 
 export default function App() {
@@ -35,7 +36,7 @@ export default function App() {
   }, [navigate]);
 
   const toggleTheme = React.useCallback(() => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
+    transitionTheme(() => setTheme(theme === 'dark' ? 'light' : 'dark'));
   }, [setTheme, theme]);
 
   React.useEffect(() => {

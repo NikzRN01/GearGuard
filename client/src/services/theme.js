@@ -47,3 +47,39 @@ export function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   return theme;
 }
+
+/**
+ * Applies a user-initiated theme change without an abrupt full-page flash.
+ * Modern browsers use a document snapshot cross-fade; older browsers receive
+ * a short token transition. Motion-sensitive users always switch instantly.
+ */
+export function transitionTheme(changeTheme) {
+  let reduceMotion = false;
+  try {
+    reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+  } catch {
+    reduceMotion = false;
+  }
+
+  if (reduceMotion) {
+    changeTheme();
+    return null;
+  }
+
+  const root = document.documentElement;
+  root.classList.add('gg-theme-transitioning');
+  const finish = () => root.classList.remove('gg-theme-transitioning');
+
+  if (typeof document.startViewTransition === 'function') {
+    const transition = document.startViewTransition(() => new Promise((resolve) => {
+      changeTheme();
+      requestAnimationFrame(resolve);
+    }));
+    transition.finished.finally(finish);
+    return transition;
+  }
+
+  changeTheme();
+  window.setTimeout(finish, 320);
+  return null;
+}

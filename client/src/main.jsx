@@ -22,7 +22,7 @@ import Teams from './pages/Teams.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import RoleRoute from './shared/RoleRoute.jsx';
 import { getDefaultAppPath, getSessionUser } from './services/session';
-import { applyTheme, resolveInitialTheme, THEME_STORAGE_KEY } from './services/theme';
+import { applyTheme, resolveInitialTheme, THEME_STORAGE_KEY, transitionTheme } from './services/theme';
 import './styles.css';
 import './styles/tokens.css';
 import './styles/manager-theme.css';
@@ -48,7 +48,7 @@ const PublicThemeToggle = () => {
   if (location.pathname.startsWith('/app')) return null;
   const toggle = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
+    transitionTheme(() => setTheme(next));
   };
   return <button type="button" className="public-theme-toggle" onClick={toggle} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}><span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>{theme === 'dark' ? 'Light' : 'Dark'}</button>;
 };

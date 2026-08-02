@@ -941,6 +941,383 @@
   font-weight: 700;
 }
 
+/* Request detail workspace: group operational tasks instead of presenting one
+   undifferentiated form. These rules are visual only; the existing controls
+   and API handlers remain unchanged. */
+.manager-shell .manager-filter-heading {
+  grid-column: 1 / -1;
+  padding-bottom: var(--gg-space-3);
+  border-bottom: 1px solid var(--gg-color-border);
+}
+
+.manager-shell .manager-filter-heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.manager-shell .manager-filter-heading span {
+  color: var(--gg-color-text);
+  font-size: var(--gg-text-sm);
+  font-weight: 800;
+}
+
+.manager-shell .manager-filter-heading small {
+  color: var(--gg-color-text-muted);
+  font-size: var(--gg-text-xs);
+}
+
+.manager-shell .manager-filter-results {
+  margin: calc(var(--gg-space-3) * -1) 0 0;
+  color: var(--gg-color-text-muted);
+  font-size: var(--gg-text-xs);
+}
+
+.manager-shell .manager-request-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--gg-color-border);
+  border-radius: var(--gg-radius-lg);
+  background: var(--gg-color-surface);
+  box-shadow: var(--gg-shadow-sm);
+}
+
+.manager-shell .manager-request-summary button {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  gap: var(--gg-space-1);
+  padding: var(--gg-space-4) var(--gg-space-5);
+  border: 0;
+  border-right: 1px solid var(--gg-color-border);
+  background: transparent;
+  color: var(--gg-color-text);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition: background-color var(--gg-duration-fast) var(--gg-ease-standard), box-shadow var(--gg-duration-fast) var(--gg-ease-standard);
+}
+
+.manager-shell .manager-request-summary button:last-child { border-right: 0; }
+.manager-shell .manager-request-summary button:hover { background: var(--gg-color-surface-subtle); }
+.manager-shell .manager-request-summary button:focus-visible { z-index: 1; outline: 2px solid var(--gg-color-focus); outline-offset: -2px; }
+.manager-shell .manager-request-summary button.active { background: var(--gg-color-primary-soft); box-shadow: inset 0 3px var(--gg-color-primary-text); }
+.manager-shell .manager-request-summary button.active.attention { box-shadow: inset 0 3px var(--gg-color-warning); }
+.manager-shell .manager-request-summary button.active.danger { box-shadow: inset 0 3px var(--gg-color-danger); }
+.manager-shell .manager-request-summary button.active.progress { box-shadow: inset 0 3px var(--gg-color-info); }
+
+.manager-shell .manager-request-summary span {
+  color: var(--gg-color-text-secondary);
+  font-size: var(--gg-text-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .055em;
+}
+
+.manager-shell .manager-request-summary strong {
+  color: var(--gg-color-text);
+  font-size: 1.6rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.manager-shell .manager-request-summary small {
+  overflow: hidden;
+  color: var(--gg-color-text-muted);
+  font-size: var(--gg-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manager-shell .manager-request-layout {
+  --manager-request-panel-height: min(720px, calc(100dvh - (2 * var(--gg-space-5))));
+  grid-template-columns: minmax(360px, .95fr) minmax(520px, 1.25fr);
+  gap: var(--gg-space-5);
+  align-items: stretch;
+}
+
+.manager-shell .manager-list-panel {
+  position: sticky;
+  top: var(--gg-space-5);
+  display: flex;
+  height: var(--manager-request-panel-height);
+  max-height: var(--manager-request-panel-height);
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.manager-shell .manager-list-panel:focus-visible,
+.manager-shell .manager-detail-panel:focus-visible {
+  outline: 3px solid var(--gg-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.manager-shell .manager-list-panel .gg-panel__body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.manager-shell .manager-list-panel .manager-scroll-stack {
+  min-height: 0;
+  max-height: none;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.manager-shell .manager-request-stack {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.manager-shell .manager-request-stack > li {
+  min-width: 0;
+}
+
+.manager-shell .manager-request-stack > li:last-child .manager-request-row {
+  border-bottom: 0;
+}
+
+.manager-shell .manager-request-row {
+  align-items: flex-start;
+  padding-block: var(--gg-space-5);
+}
+
+.manager-shell .manager-request-row__primary {
+  gap: var(--gg-space-1);
+}
+
+.manager-shell .manager-request-row__id {
+  color: var(--gg-color-primary-text);
+  font-size: .68rem;
+  font-weight: 850;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.manager-shell .manager-request-row__primary strong {
+  line-height: 1.35;
+}
+
+.manager-shell .manager-request-row__context {
+  color: var(--gg-color-text-muted);
+  font-size: var(--gg-text-xs);
+  text-transform: capitalize;
+}
+
+.manager-shell .manager-request-row__context i {
+  padding-inline: 3px;
+  font-style: normal;
+}
+
+.manager-shell .manager-request-row__owner {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: var(--gg-space-1);
+  padding: 3px 8px;
+  border-radius: var(--gg-radius-pill);
+  background: var(--gg-color-neutral-soft);
+  color: var(--gg-color-text-secondary);
+  font-size: .68rem;
+  font-weight: 750;
+}
+
+.manager-shell .manager-request-row__owner.is-unassigned {
+  background: var(--gg-color-warning-soft);
+  color: var(--gg-color-warning);
+}
+
+.manager-shell .manager-row-meta {
+  min-width: 112px;
+}
+
+.manager-shell .manager-detail-panel {
+  position: sticky;
+  top: var(--gg-space-5);
+  height: var(--manager-request-panel-height);
+  max-height: var(--manager-request-panel-height);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+}
+
+.manager-shell .manager-detail-heading {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  align-items: center;
+  padding: var(--gg-space-6);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--gg-color-primary-soft) 82%, var(--gg-color-surface)), var(--gg-color-surface) 72%);
+  box-shadow: 0 1px 0 var(--gg-color-border);
+}
+
+.manager-shell .manager-detail-heading h2 {
+  max-width: 34ch;
+  margin-top: var(--gg-space-1);
+  font-size: clamp(1.15rem, 2vw, 1.45rem);
+  line-height: 1.25;
+}
+
+.manager-shell .manager-detail-grid {
+  gap: var(--gg-space-3);
+  padding: var(--gg-space-5) var(--gg-space-6);
+  background: var(--gg-color-surface-subtle);
+}
+
+.manager-shell .manager-detail-grid > div {
+  min-width: 0;
+  padding: var(--gg-space-3) var(--gg-space-4);
+  border: 1px solid var(--gg-color-border);
+  border-radius: var(--gg-radius-md);
+  background: var(--gg-color-surface);
+}
+
+.manager-shell .manager-detail-grid dt {
+  letter-spacing: .06em;
+}
+
+.manager-shell .manager-detail-grid dd {
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
+.manager-shell .manager-form-section,
+.manager-shell .manager-history {
+  margin: var(--gg-space-4) var(--gg-space-5) 0;
+  padding: var(--gg-space-5);
+  border: 1px solid var(--gg-color-border);
+  border-radius: var(--gg-radius-lg);
+  background: var(--gg-color-surface);
+  box-shadow: var(--gg-shadow-sm);
+}
+
+.manager-shell .manager-form-section {
+  grid-template-columns: minmax(180px, .7fr) minmax(230px, 1.3fr) auto;
+}
+
+.manager-shell .manager-form-section--controls {
+  grid-template-columns: 1fr;
+  align-items: stretch;
+}
+
+.manager-shell .manager-section-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--gg-space-3);
+}
+
+.manager-shell .manager-section-number {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--gg-color-border-accent);
+  border-radius: var(--gg-radius-pill);
+  background: var(--gg-color-primary-soft);
+  color: var(--gg-color-primary-text);
+  font-size: .68rem;
+  font-weight: 850;
+  letter-spacing: .04em;
+}
+
+.manager-shell .manager-section-intro h3 {
+  margin: 1px 0 var(--gg-space-1);
+}
+
+.manager-shell .manager-section-intro p,
+.manager-shell .manager-history .manager-section-intro p {
+  margin: 0;
+  color: var(--gg-color-text-muted);
+  font-size: var(--gg-text-xs);
+  line-height: 1.45;
+}
+
+.manager-shell .manager-request-actions {
+  padding-top: var(--gg-space-1);
+}
+
+.manager-shell .manager-request-actions .manager-delete-request {
+  margin-left: auto;
+}
+
+.manager-shell .manager-history {
+  margin-bottom: var(--gg-space-5);
+}
+
+.manager-shell .manager-history > .manager-section-intro {
+  margin-bottom: var(--gg-space-4);
+}
+
+.manager-shell .manager-note-composer {
+  padding: var(--gg-space-3);
+  border: 1px solid var(--gg-color-border);
+  border-radius: var(--gg-radius-md);
+  background: var(--gg-color-surface-subtle);
+}
+
+.manager-shell .manager-history article {
+  border: 1px solid var(--gg-color-border);
+  border-left: 3px solid var(--gg-color-info);
+  border-radius: var(--gg-radius-md);
+}
+
+@media (max-width: 1200px) {
+  .manager-shell .manager-request-layout { grid-template-columns: 1fr; }
+  .manager-shell .manager-list-panel { position: static; }
+}
+
+@media (max-width: 900px) {
+  .manager-shell .manager-list-panel,
+  .manager-shell .manager-detail-panel {
+    position: static;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    overscroll-behavior: auto;
+  }
+
+  .manager-shell .manager-list-panel .gg-panel__body {
+    display: block;
+    flex: none;
+  }
+
+  .manager-shell .manager-list-panel .manager-scroll-stack {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .manager-shell .manager-detail-heading {
+    position: static;
+  }
+}
+
+@media (max-width: 760px) {
+  .manager-shell .manager-request-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .manager-shell .manager-request-summary button:nth-child(2) { border-right: 0; }
+  .manager-shell .manager-request-summary button:nth-child(-n + 2) { border-bottom: 1px solid var(--gg-color-border); }
+  .manager-shell .manager-list-panel { position: static; }
+
+  .manager-shell .manager-detail-heading,
+  .manager-shell .manager-detail-grid {
+    padding: var(--gg-space-4);
+  }
+
+  .manager-shell .manager-form-section,
+  .manager-shell .manager-history {
+    margin-inline: var(--gg-space-3);
+    padding: var(--gg-space-4);
+  }
+
+  .manager-shell .manager-request-actions .manager-delete-request {
+    margin-left: 0;
+  }
+}
+
 .manager-shell .table {
   color: var(--gg-color-text);
 }
