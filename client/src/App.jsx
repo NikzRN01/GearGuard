@@ -206,7 +206,7 @@ export default function App() {
         {usesOperationsShell ? (
           <div className="manager-sidebar__footer">
             <div className="manager-sidebar__user"><strong>{user?.name || workspaceLabel}</strong><span>{user?.email || `${workspaceLabel} account`}</span>{isAdmin && <em>System administrator</em>}</div>
-            <button type="button" className="manager-theme-toggle" aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} aria-pressed={theme === 'dark'} onClick={toggleTheme}><span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span><span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span></button>
+            <button type="button" className="manager-theme-toggle" aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} aria-pressed={theme === 'dark'} onClick={toggleTheme}><span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span><span className="manager-theme-toggle__label manager-theme-toggle__label--short">{theme === 'dark' ? 'Light' : 'Dark'}</span><span className="manager-theme-toggle__label manager-theme-toggle__label--long">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span></button>
             <button type="button" className="sidebar-logout" onClick={handleLogout}>Log out</button>
           </div>
         ) : (

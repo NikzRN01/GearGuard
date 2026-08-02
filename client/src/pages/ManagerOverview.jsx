@@ -174,9 +174,15 @@ export default function ManagerOverview() {
               <div className="manager-workload-grid">
                 {workload.slice(0, 6).map((person) => (
                   <article key={person.id} className="manager-person-card">
-                    <div className="manager-person-avatar" aria-hidden="true">{person.name?.charAt(0)?.toUpperCase() || '?'}</div>
-                    <div><strong>{person.name}</strong><span>{person.role}</span></div>
-                    <dl><div><dt>Active</dt><dd>{person.active}</dd></div><div><dt>Working</dt><dd>{person.inProgress}</dd></div><div><dt>Overdue</dt><dd>{person.overdue}</dd></div></dl>
+                    <div className="manager-person-identity">
+                      <div className="manager-person-avatar" aria-hidden="true">{person.name?.charAt(0)?.toUpperCase() || '?'}</div>
+                      <div className="manager-person-copy"><strong>{person.name}</strong><span>{person.role}</span></div>
+                    </div>
+                    <dl aria-label={`Workload summary for ${person.name}`}>
+                      <div className="manager-person-metric"><dt>Active</dt><dd>{person.active}</dd></div>
+                      <div className="manager-person-metric manager-person-metric--working"><dt>Working</dt><dd>{person.inProgress}</dd></div>
+                      <div className={`manager-person-metric manager-person-metric--overdue${person.overdue > 0 ? ' has-value' : ''}`}><dt>Overdue</dt><dd>{person.overdue}</dd></div>
+                    </dl>
                   </article>
                 ))}
               </div>

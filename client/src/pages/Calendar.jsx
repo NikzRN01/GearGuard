@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import Alert from '../components/ui/Alert';
 import Button from '../components/ui/Button';
@@ -46,12 +47,21 @@ const buildEventTimes = (scheduledDate) => {
 };
 
 export default function Calendar() {
-	const isAdmin = getSessionUser()?.role === 'admin';
+	const navigate = useNavigate();
+	const sessionRole = getSessionUser()?.role;
+	const isAdmin = sessionRole === 'admin';
 	const [currentDate, setCurrentDate] = useState(new Date());
 	const [view, setView] = useState('week');
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState('');
 	const [scheduledRequests, setScheduledRequests] = useState([]);
+	const [navigationDirection, setNavigationDirection] = useState('fade');
+	const calendarSwipeRef = useRef(null);
+	const wheelSwipeRef = useRef({ distance: 0, lastEventAt: 0, triggered: false, resetTimer: null });
+
+	useEffect(() => () => {
+		if (wheelSwipeRef.current.resetTimer) window.clearTimeout(wheelSwipeRef.current.resetTimer);
+	}, []);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -127,8 +137,12 @@ export default function Calendar() {
 		return Math.ceil((((target - yearStart) / 86400000) + 1) / 7);
 	};
 
-	const goToToday = () => setCurrentDate(new Date());
+	const goToToday = () => {
+		setNavigationDirection('fade');
+		setCurrentDate(new Date());
+	};
 	const goToPrevious = () => {
+		setNavigationDirection('previous');
 		const newDate = new Date(currentDate);
 		if (view === 'week') {
 			newDate.setDate(newDate.getDate() - 7);
@@ -138,6 +152,7 @@ export default function Calendar() {
 		setCurrentDate(newDate);
 	};
 	const goToNext = () => {
+		setNavigationDirection('next');
 		const newDate = new Date(currentDate);
 		if (view === 'week') {
 			newDate.setDate(newDate.getDate() + 7);
@@ -147,13 +162,82 @@ export default function Calendar() {
 		setCurrentDate(newDate);
 	};
 
+	const beginCalendarSwipe = (event) => {
+		if (event.pointerType !== 'touch' || event.target.closest('button, select, input, a')) return;
+		event.currentTarget.setPointerCapture?.(event.pointerId);
+		calendarSwipeRef.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
+	};
+
+	const finishCalendarSwipe = (event) => {
+		const start = calendarSwipeRef.current;
+		calendarSwipeRef.current = null;
+		if (!start || start.pointerId !== event.pointerId) return;
+
+		const horizontalDistance = event.clientX - start.x;
+		const verticalDistance = event.clientY - start.y;
+		if (Math.abs(horizontalDistance) < 96 || Math.abs(horizontalDistance) <= Math.abs(verticalDistance) * 1.45) return;
+		if (horizontalDistance < 0) goToNext();
+		else goToPrevious();
+	};
+
+	const cancelCalendarSwipe = () => {
+		calendarSwipeRef.current = null;
+	};
+
+	const handleCalendarWheel = (event) => {
+		const horizontal = event.deltaX;
+		const vertical = event.deltaY;
+		const state = wheelSwipeRef.current;
+		if (state.triggered && Math.abs(horizontal) >= 1) {
+			event.preventDefault();
+			if (state.resetTimer) window.clearTimeout(state.resetTimer);
+			state.resetTimer = window.setTimeout(() => {
+				state.distance = 0;
+				state.triggered = false;
+				state.resetTimer = null;
+			}, 280);
+			return;
+		}
+		if (Math.abs(horizontal) < 6 || Math.abs(horizontal) <= Math.abs(vertical) * 1.45) return;
+
+		const scrollRegion = event.target.closest('.calendar-grid, .calendar-month-grid');
+		if (scrollRegion && scrollRegion.scrollWidth > scrollRegion.clientWidth) {
+			const movingLeft = horizontal < 0;
+			const canScrollLeft = scrollRegion.scrollLeft > 0;
+			const canScrollRight = scrollRegion.scrollLeft + scrollRegion.clientWidth < scrollRegion.scrollWidth - 1;
+			if ((movingLeft && canScrollLeft) || (!movingLeft && canScrollRight)) return;
+		}
+
+		event.preventDefault();
+		const now = Date.now();
+		if (state.resetTimer) window.clearTimeout(state.resetTimer);
+		state.resetTimer = window.setTimeout(() => {
+			state.distance = 0;
+			state.triggered = false;
+			state.resetTimer = null;
+		}, 280);
+		if (state.triggered) return;
+		if (now - state.lastEventAt > 180) state.distance = 0;
+		if (state.distance !== 0 && Math.sign(state.distance) !== Math.sign(horizontal)) state.distance = 0;
+		state.lastEventAt = now;
+		state.distance += horizontal;
+		if (Math.abs(state.distance) < 120) return;
+
+		if (state.distance > 0) goToNext();
+		else goToPrevious();
+		state.distance = 0;
+		state.triggered = true;
+	};
+
 	const goToPreviousMonth = () => {
+		setNavigationDirection('previous');
 		const newDate = new Date(currentDate);
 		newDate.setMonth(newDate.getMonth() - 1);
 		setCurrentDate(newDate);
 	};
 
 	const goToNextMonth = () => {
+		setNavigationDirection('next');
 		const newDate = new Date(currentDate);
 		newDate.setMonth(newDate.getMonth() + 1);
 		setCurrentDate(newDate);
@@ -161,9 +245,13 @@ export default function Calendar() {
 
 	const isToday = (date) => {
 		const today = new Date();
-		return date.getDate() === today.getDate() &&
-			date.getMonth() === today.getMonth() &&
-			date.getFullYear() === today.getFullYear();
+		return isSameDate(date, today);
+	};
+
+	const isSameDate = (first, second) => {
+		return first.getDate() === second.getDate() &&
+			first.getMonth() === second.getMonth() &&
+			first.getFullYear() === second.getFullYear();
 	};
 
 	const getEventPosition = (event) => {
@@ -172,6 +260,20 @@ export default function Calendar() {
 		const top = (startHour - 6) * 50; // Offset by 6 hours (business hours start), 50px per hour
 		const height = (endHour - startHour) * 50;
 		return { top: `${top}px`, height: `${height}px` };
+	};
+
+	const openRequest = (requestId) => {
+		if (sessionRole === 'manager' || sessionRole === 'admin') {
+			navigate(`/app/manager/requests/${requestId}`);
+			return;
+		}
+		navigate('/app/requests');
+	};
+
+	const openDay = (day) => {
+		setNavigationDirection('fade');
+		setCurrentDate(day);
+		setView('week');
 	};
 
 	const events = useMemo(() => {
@@ -192,10 +294,17 @@ export default function Calendar() {
 			.filter(Boolean);
 	}, [scheduledRequests]);
 	const visibleEvents = events.filter((event) => weekDays.some((day) =>
-		event.date.getDate() === day.getDate() &&
-		event.date.getMonth() === day.getMonth() &&
-		event.date.getFullYear() === day.getFullYear()
+		isSameDate(event.date, day)
 	));
+	const monthEvents = events.filter((event) =>
+		event.date.getMonth() === currentDate.getMonth() &&
+		event.date.getFullYear() === currentDate.getFullYear()
+	);
+	const periodEvents = view === 'month' ? monthEvents : visibleEvents;
+	const weekRange = `${weekDays[0].toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – ${weekDays[6].toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
+	const periodLabel = view === 'month' ? `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}` : weekRange;
+	const transitionKey = `${view}-${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}`;
+	const transitionClass = `calendar-period-transition calendar-period-transition--${navigationDirection}`;
 
 	return (
 		<div className="container manager-page manager-schedule-page">
@@ -204,16 +313,20 @@ export default function Calendar() {
 				title="Maintenance schedule"
 				description="Review scheduled maintenance work by date."
 				actions={<div className="calendar-controls" aria-label="Schedule navigation">
-					<Button variant="secondary" aria-label="Previous week" onClick={goToPrevious}>←</Button>
+					<Button variant="secondary" aria-label={`Previous ${view}`} title={`Previous ${view}`} onClick={goToPrevious}>←</Button>
 					<Button variant="secondary" onClick={goToToday}>Today</Button>
-					<Button variant="secondary" aria-label="Next week" onClick={goToNext}>→</Button>
+					<Button variant="secondary" aria-label={`Next ${view}`} title={`Next ${view}`} onClick={goToNext}>→</Button>
 					<select 
 						className="calendar-view-select"
 						value={view}
-						onChange={(e) => setView(e.target.value)}
+						onChange={(e) => {
+							setNavigationDirection('fade');
+							setView(e.target.value);
+						}}
 						aria-label="Schedule view"
 					>
 						<option value="week">Week</option>
+						<option value="month">Month</option>
 					</select>
 				</div>}
 			/>
@@ -224,16 +337,29 @@ export default function Calendar() {
 			{loading && <div className="manager-state" role="status">Loading maintenance schedule...</div>}
 
 			{!loading && !error && <div className="calendar-content">
-				<div className="calendar-main">
-					<div className="calendar-week-info">
-						<span className="calendar-month-year">
-							{monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-						</span>
-						<span className="calendar-week-number">Week {getWeekNumber(currentDate)}</span>
+				<div
+					className="calendar-main calendar-main--interactive"
+					onPointerDown={beginCalendarSwipe}
+					onPointerUp={finishCalendarSwipe}
+					onPointerCancel={cancelCalendarSwipe}
+					onWheel={handleCalendarWheel}
+				>
+					<div key={`header-${transitionKey}`} className={`calendar-week-info ${transitionClass}`}>
+						<div>
+							<span className="calendar-month-year">{monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}</span>
+							<span className="calendar-week-range">{view === 'week' ? weekRange : 'Full month overview'}</span>
+						</div>
+						<div className="calendar-week-summary">
+							<span><strong>{periodEvents.length}</strong> scheduled</span>
+							<span className="calendar-week-number">{view === 'week' ? `Week ${getWeekNumber(currentDate)}` : 'Month view'}</span>
+							<span className="calendar-gesture-hint">Swipe left or right to navigate</span>
+						</div>
 					</div>
 
-					{visibleEvents.length === 0 ? <EmptyState title="No work scheduled this week" description="Use the week controls to review another period. Scheduled requests will appear here." /> : <div className="calendar-grid">
+					{periodEvents.length === 0 && <div className="calendar-empty-notice"><EmptyState compact title={`No work scheduled this ${view}`} description="Use the controls above or the month picker to review another period." /></div>}
+					{view === 'week' ? <div key={`week-${transitionKey}`} className={`calendar-grid ${transitionClass}`} tabIndex="0" aria-label={`Week schedule for ${weekRange}`}>
 						<div className="calendar-time-column">
+							<div className="calendar-time-header" aria-hidden="true">Time</div>
 							{timeSlots.map((time) => (
 								<div key={time} className="time-slot">{time}</div>
 							))}
@@ -264,29 +390,48 @@ export default function Calendar() {
 												req.date.getFullYear() === day.getFullYear()
 											)
 											.map(event => (
-												<div
-													key={event.id}
-													className={`calendar-event priority-${event.priority}`}
-													style={getEventPosition(event)}
-												>
-													{event.title}
-												</div>
+											<button
+												type="button"
+												key={event.id}
+												className={`calendar-event priority-${event.priority}`}
+												style={getEventPosition(event)}
+												title={`${event.title}${event.equipment ? ` — ${event.equipment}` : ''}, ${event.startTime}–${event.endTime}`}
+												onClick={() => openRequest(event.id)}
+												aria-label={`Open request: ${event.title}, ${event.startTime} to ${event.endTime}`}
+											>
+												<strong>{event.title}</strong>
+												<span>{event.startTime}–{event.endTime}{event.equipment ? ` · ${event.equipment}` : ''}</span>
+											</button>
 											))
 										}
 									</div>
 								))}
 							</div>
 						</div>
+					</div> : <div key={`month-${transitionKey}`} className={`calendar-month-grid ${transitionClass}`} role="grid" aria-label={`Month schedule for ${periodLabel}`}>
+						{['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day) => <div key={day} className="calendar-month-weekday" role="columnheader">{day}</div>)}
+						{monthDays.map((day, idx) => {
+							const dayEvents = day ? monthEvents.filter((event) => isSameDate(event.date, day)) : [];
+							return <div key={day ? day.toISOString() : `empty-${idx}`} className={`calendar-month-day${day && isToday(day) ? ' is-today' : ''}${day && isSameDate(day, currentDate) ? ' is-selected' : ''}${!day ? ' is-empty' : ''}`} role="gridcell">
+								{day && <>
+									<button type="button" className="calendar-month-date" onClick={() => openDay(day)} aria-label={`Open week of ${day.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}`} aria-current={isToday(day) ? 'date' : undefined}>{day.getDate()}</button>
+									<div className="calendar-month-events">
+										{dayEvents.slice(0, 3).map((event) => <button type="button" key={event.id} className="calendar-month-event" title={`${event.title}, ${event.startTime}`} onClick={() => openRequest(event.id)} aria-label={`Open request: ${event.title}, ${event.startTime}`}><span>{event.startTime}</span><strong>{event.title}</strong></button>)}
+										{dayEvents.length > 3 && <span className="calendar-month-more">+{dayEvents.length - 3} more</span>}
+									</div>
+								</>}
+							</div>;
+						})}
 					</div>}
 				</div>
 
 				<div className="calendar-mini">
 					<div className="mini-calendar-header">
-						<button className="mini-nav-btn" onClick={goToPreviousMonth}>←</button>
+						<button type="button" className="mini-nav-btn" aria-label="Previous month" onClick={goToPreviousMonth}>←</button>
 						<span className="mini-month-year">
 							{monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
 						</span>
-						<button className="mini-nav-btn" onClick={goToNextMonth}>→</button>
+						<button type="button" className="mini-nav-btn" aria-label="Next month" onClick={goToNextMonth}>→</button>
 					</div>
 
 					<div className="mini-calendar-grid">
@@ -300,12 +445,16 @@ export default function Calendar() {
 								<button
 									type="button"
 									key={idx} 
-									className={`mini-day ${day ? '' : 'empty'} ${day && isToday(day) ? 'today' : ''} ${day && day.getDate() === currentDate.getDate() ? 'selected' : ''}`}
+									className={`mini-day ${day ? '' : 'empty'} ${day && isToday(day) ? 'today' : ''} ${day && isSameDate(day, currentDate) ? 'selected' : ''}`}
 									disabled={!day}
-									onClick={() => day && setCurrentDate(day)}
+									onClick={() => {
+										if (!day) return;
+										setNavigationDirection('fade');
+										setCurrentDate(day);
+									}}
 									aria-label={day ? day.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : undefined}
 									aria-current={day && isToday(day) ? 'date' : undefined}
-									aria-pressed={day ? day.getDate() === currentDate.getDate() : undefined}
+									aria-pressed={day ? isSameDate(day, currentDate) : undefined}
 								>
 									{day ? day.getDate() : ''}
 								</button>

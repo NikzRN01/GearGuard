@@ -17,6 +17,7 @@
 export const THEME_STORAGE_KEY = 'gearguard-theme';
 
 const THEMES = ['light', 'dark'];
+let themeTransitionTimer = null;
 
 /** The stored preference, or null if absent, unreadable or not a real theme. */
 export function readStoredTheme() {
@@ -50,8 +51,9 @@ export function applyTheme(theme) {
 
 /**
  * Applies a user-initiated theme change without an abrupt full-page flash.
- * Modern browsers use a document snapshot cross-fade; older browsers receive
- * a short token transition. Motion-sensitive users always switch instantly.
+ * A short-lived root class lets CSS transition only major surfaces. Avoid a
+ * document View Transition here: snapshotting a dashboard and its canvas is
+ * substantially more expensive than interpolating a small set of tokens.
  */
 export function transitionTheme(changeTheme) {
   let reduceMotion = false;
@@ -67,19 +69,19 @@ export function transitionTheme(changeTheme) {
   }
 
   const root = document.documentElement;
+  const targetTheme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+  if (themeTransitionTimer) window.clearTimeout(themeTransitionTimer);
+  root.classList.remove('gg-theme-to-light', 'gg-theme-to-dark');
   root.classList.add('gg-theme-transitioning');
-  const finish = () => root.classList.remove('gg-theme-transitioning');
-
-  if (typeof document.startViewTransition === 'function') {
-    const transition = document.startViewTransition(() => new Promise((resolve) => {
-      changeTheme();
-      requestAnimationFrame(resolve);
-    }));
-    transition.finished.finally(finish);
-    return transition;
-  }
+  root.classList.add(`gg-theme-to-${targetTheme}`);
+  const finish = () => {
+    root.classList.remove('gg-theme-transitioning', 'gg-theme-to-light', 'gg-theme-to-dark');
+  };
 
   changeTheme();
-  window.setTimeout(finish, 320);
+  themeTransitionTimer = window.setTimeout(() => {
+    finish();
+    themeTransitionTimer = null;
+  }, 560);
   return null;
 }

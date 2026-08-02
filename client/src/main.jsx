@@ -21,6 +21,7 @@ import UserRequests from './pages/UserRequests.jsx';
 import Teams from './pages/Teams.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import RoleRoute from './shared/RoleRoute.jsx';
+import ThemeTransitionLoader from './components/ui/ThemeTransitionLoader.jsx';
 import { getDefaultAppPath, getSessionUser } from './services/session';
 import { applyTheme, resolveInitialTheme, THEME_STORAGE_KEY, transitionTheme } from './services/theme';
 import './styles.css';
@@ -58,6 +59,7 @@ root.render(
   <React.StrictMode>
     <ThemeProvider attribute="data-theme" storageKey={THEME_STORAGE_KEY} defaultTheme={initialTheme} enableSystem={false}>
       <BrowserRouter>
+        <ThemeTransitionLoader />
         <PublicThemeToggle />
         <Routes>
         <Route path="/" element={<Landing />} />

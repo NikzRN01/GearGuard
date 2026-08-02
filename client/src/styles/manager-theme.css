@@ -107,9 +107,8 @@
   display: flex;
   width: 248px;
   height: 100vh;
-  overflow-y: auto;
-  scrollbar-width: none;
-  padding: var(--gg-space-5) var(--gg-space-3);
+  overflow: hidden;
+  padding: clamp(10px, 2vh, var(--gg-space-5)) var(--gg-space-3);
   border-right: 1px solid var(--gg-color-border);
   background: var(--gg-color-surface);
   box-shadow: none;
@@ -124,7 +123,7 @@
   display: flex;
   align-items: center;
   gap: var(--gg-space-3);
-  padding: var(--gg-space-2) var(--gg-space-3) var(--gg-space-6);
+  padding: clamp(2px, .8vh, var(--gg-space-2)) var(--gg-space-3) clamp(10px, 2.5vh, var(--gg-space-6));
 }
 
 .manager-sidebar__mark {
@@ -155,7 +154,7 @@
 }
 
 .manager-sidebar__group-label {
-  margin: var(--gg-space-5) var(--gg-space-3) var(--gg-space-2);
+  margin: clamp(8px, 1.8vh, var(--gg-space-5)) var(--gg-space-3) clamp(4px, .8vh, var(--gg-space-2));
   color: var(--gg-color-text-muted);
   font-size: 0.68rem;
   font-weight: 700;
@@ -165,9 +164,9 @@
 
 .manager-sidebar a,
 .manager-sidebar summary {
-  min-height: 42px;
-  margin: 2px 0;
-  padding: 10px 12px;
+  min-height: clamp(34px, 4.7vh, 42px);
+  margin: 1px 0;
+  padding: clamp(6px, 1vh, 10px) 12px;
   border-radius: var(--gg-radius-md);
   color: var(--gg-color-text-secondary);
   font-size: var(--gg-text-sm);
@@ -189,16 +188,16 @@
 
 .manager-sidebar__footer {
   display: grid;
-  gap: var(--gg-space-3);
+  gap: clamp(6px, 1.2vh, var(--gg-space-3));
   margin-top: auto;
-  padding: var(--gg-space-4) var(--gg-space-2) 0;
+  padding: clamp(8px, 1.6vh, var(--gg-space-4)) var(--gg-space-2) 0;
   border-top: 1px solid var(--gg-color-border);
 }
 
 .manager-theme-toggle {
   display: flex;
   width: 100%;
-  min-height: 40px;
+  min-height: clamp(34px, 4.5vh, 40px);
   align-items: center;
   gap: var(--gg-space-2);
   padding: 0 var(--gg-space-3);
@@ -228,6 +227,14 @@
   color: var(--gg-color-primary-contrast);
 }
 
+.manager-theme-toggle__label--short { display: none; }
+
+.manager-theme-toggle__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .manager-sidebar__user {
   display: grid;
   gap: 2px;
@@ -245,7 +252,7 @@
 .manager-sidebar .sidebar-logout {
   position: static;
   width: 100%;
-  min-height: 40px;
+  min-height: clamp(34px, 4.5vh, 40px);
   margin: 0;
   border: 1px solid var(--gg-color-border-strong);
   border-radius: var(--gg-radius-md);
@@ -353,6 +360,43 @@
   background: var(--gg-color-danger-soft);
   border-color: color-mix(in srgb, var(--gg-color-danger) 38%, var(--gg-color-border));
   color: var(--gg-color-danger);
+}
+
+@media (max-height: 760px) and (min-width: 901px) {
+  .manager-sidebar__mark {
+    width: 34px;
+    height: 34px;
+  }
+
+  .manager-sidebar__brand-copy span { display: none; }
+
+  .manager-sidebar__footer {
+    grid-template-columns: 1fr 1fr;
+    column-gap: var(--gg-space-2);
+  }
+
+  .manager-sidebar__user {
+    grid-column: 1 / -1;
+  }
+
+  .manager-theme-toggle,
+  .manager-sidebar .sidebar-logout {
+    min-width: 0;
+    min-height: 40px;
+    padding-inline: var(--gg-space-2);
+  }
+
+  .manager-theme-toggle {
+    justify-content: center;
+  }
+
+  .manager-theme-toggle > span:first-child {
+    width: 20px;
+    height: 20px;
+  }
+
+  .manager-theme-toggle__label--short { display: inline; }
+  .manager-theme-toggle__label--long { display: none; }
 }
 
 .gg-button--danger:hover:not(:disabled) {
@@ -1483,18 +1527,216 @@
 }
 
 .manager-shell .manager-overview-page .manager-workload-grid {
-  gap: 0;
-  padding: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--gg-space-3);
+  padding: var(--gg-space-4);
+  background: var(--gg-color-surface-subtle);
 }
 
 .manager-shell .manager-overview-page .manager-person-card {
-  border-width: 0 1px 0 0;
-  border-radius: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  align-content: space-between;
+  min-width: 0;
+  min-height: 156px;
+  padding: var(--gg-space-4);
+  border: 1px solid var(--gg-color-border);
+  border-radius: var(--gg-radius-lg);
   background: var(--gg-color-surface);
+  box-shadow: var(--gg-shadow-sm);
+  transition: border-color var(--gg-duration-fast) var(--gg-ease-standard), box-shadow var(--gg-duration-fast) var(--gg-ease-standard), transform var(--gg-duration-fast) var(--gg-ease-standard);
 }
 
-.manager-shell .manager-overview-page .manager-person-card:last-child {
-  border-right: 0;
+.manager-shell .manager-overview-page .manager-person-card:hover {
+  border-color: var(--gg-color-border-strong);
+  box-shadow: var(--gg-shadow-sm);
+  transform: translateY(-2px);
+}
+
+.manager-shell .manager-overview-page .manager-person-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--gg-space-3);
+  min-width: 0;
+}
+
+.manager-shell .manager-overview-page .manager-person-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.manager-shell .manager-overview-page .manager-person-copy strong,
+.manager-shell .manager-overview-page .manager-person-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manager-shell .manager-overview-page .manager-person-avatar {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--gg-color-primary-soft);
+  color: var(--gg-color-primary-text);
+}
+
+.manager-shell .manager-overview-page .manager-person-card dl {
+  gap: var(--gg-space-2);
+  margin-top: var(--gg-space-4);
+}
+
+.manager-shell .manager-overview-page .manager-person-metric {
+  min-width: 0;
+  padding: var(--gg-space-2) var(--gg-space-3);
+  border-radius: var(--gg-radius-md);
+  background: var(--gg-color-surface-subtle);
+}
+
+.manager-shell .manager-overview-page .manager-person-metric dt {
+  color: var(--gg-color-text-muted);
+  font-size: .72rem;
+  font-weight: 650;
+}
+
+/* Assigned workload directory */
+.manager-shell .manager-workload-page {
+  gap: var(--gg-space-4);
+}
+
+.manager-shell .manager-workload-page .gg-page-header {
+  align-items: center;
+}
+
+.manager-shell .manager-workload-page > .gg-alert {
+  margin: 0;
+}
+
+.manager-shell .manager-workload-page > .gg-panel .gg-panel__body {
+  padding: 0;
+}
+
+.manager-shell .manager-workload-table-wrap {
+  overflow-x: auto;
+}
+
+.manager-shell .manager-workload-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.manager-shell .manager-workload-table .workload-col-member { width: 29%; }
+.manager-shell .manager-workload-table .workload-col-role { width: 14%; }
+.manager-shell .manager-workload-table .workload-col-metric { width: 14%; }
+.manager-shell .manager-workload-table .workload-col-action { width: 15%; }
+
+.manager-shell .manager-workload-table th,
+.manager-shell .manager-workload-table td {
+  height: 66px;
+  padding-inline: var(--gg-space-5);
+}
+
+.manager-shell .manager-workload-table thead th {
+  height: 50px;
+  color: var(--gg-color-text-muted);
+  font-size: var(--gg-text-xs);
+  font-weight: 750;
+  letter-spacing: .02em;
+}
+
+.manager-shell .manager-workload-table thead th:nth-child(n + 3):nth-child(-n + 5),
+.manager-shell .manager-workload-action-heading {
+  text-align: center;
+}
+
+.manager-shell .manager-workload-member {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--gg-space-3);
+}
+
+.manager-shell .manager-workload-member strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manager-shell .manager-workload-avatar {
+  display: grid;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 13px;
+  background: var(--gg-color-primary-soft-strong);
+  color: var(--gg-color-primary-text);
+  font-weight: 800;
+}
+
+.manager-shell .manager-role-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 5px 9px;
+  border: 1px solid var(--gg-color-border-accent);
+  border-radius: 999px;
+  background: var(--gg-color-primary-soft);
+  color: var(--gg-color-primary-text);
+  font-size: var(--gg-text-xs);
+  font-weight: 750;
+  text-transform: capitalize;
+}
+
+.manager-shell .manager-role-badge--manager {
+  border-color: color-mix(in srgb, var(--gg-color-warning) 45%, var(--gg-color-border));
+  background: var(--gg-color-warning-soft);
+  color: var(--gg-color-warning);
+}
+
+.manager-shell .manager-workload-table .manager-workload-metric {
+  text-align: center;
+}
+
+.manager-shell .manager-workload-metric strong {
+  color: var(--gg-color-text);
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.manager-shell .manager-workload-action {
+  text-align: center;
+}
+
+.manager-shell .manager-workload-action .gg-button {
+  min-width: 116px;
+}
+
+@media (max-width: 640px) {
+  .manager-shell .manager-workload-table th,
+  .manager-shell .manager-workload-table td { height: auto; }
+
+  .manager-shell .manager-workload-member { max-width: 68%; }
+  .manager-shell .manager-workload-action { align-items: stretch; flex-direction: column; }
+}
+
+.manager-shell .manager-overview-page .manager-person-metric dd {
+  color: var(--gg-color-text);
+  font-size: 1.1rem;
+  line-height: 1.25;
+}
+
+.manager-shell .manager-overview-page .manager-person-metric--working dd {
+  color: var(--gg-color-primary-text);
+}
+
+.manager-shell .manager-overview-page .manager-person-metric--overdue.has-value {
+  background: var(--gg-color-danger-soft);
+}
+
+.manager-shell .manager-overview-page .manager-person-metric--overdue.has-value dd {
+  color: var(--gg-color-danger);
 }
 
 @media (max-width: 1100px) {
@@ -1505,8 +1747,7 @@
   .manager-shell .manager-overview-page .manager-kpi:nth-child(2) { border-right: 0; }
   .manager-shell .manager-overview-page .manager-kpi:nth-child(-n + 2) { border-bottom: 1px solid var(--gg-color-border); }
   .manager-shell .manager-overview-page .manager-dashboard-grid { grid-template-columns: 1fr; }
-  .manager-shell .manager-overview-page .manager-person-card { border-bottom: 1px solid var(--gg-color-border); }
-  .manager-shell .manager-overview-page .manager-person-card:nth-child(even) { border-right: 0; }
+  .manager-shell .manager-overview-page .manager-workload-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 640px) {
@@ -1517,8 +1758,12 @@
     border-bottom: 1px solid var(--gg-color-border);
   }
   .manager-shell .manager-overview-page .manager-kpi:last-child { border-bottom: 0; }
-  .manager-shell .manager-overview-page .manager-person-card { border-right: 0; }
-  .manager-shell .manager-overview-page .manager-person-card:last-child { border-bottom: 0; }
+  .manager-shell .manager-overview-page .manager-workload-grid {
+    grid-template-columns: 1fr;
+    padding: var(--gg-space-3);
+  }
+
+  .manager-shell .manager-overview-page .manager-person-card { min-height: 0; }
 }
 
 /* Admin workspace */
@@ -2016,6 +2261,67 @@
 }
 
 /* Manager schedule migration */
+@keyframes gg-calendar-enter-next {
+  from { opacity: .35; transform: translateX(18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes gg-calendar-enter-previous {
+  from { opacity: .35; transform: translateX(-18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes gg-calendar-enter-fade {
+  from { opacity: .45; transform: scale(.992); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.manager-shell .manager-schedule-page .calendar-period-transition {
+  will-change: opacity, transform;
+  animation-duration: 260ms;
+  animation-timing-function: var(--gg-ease-emphasized);
+  animation-fill-mode: both;
+}
+
+.manager-shell .manager-schedule-page .calendar-period-transition--next {
+  animation-name: gg-calendar-enter-next;
+}
+
+.manager-shell .manager-schedule-page .calendar-period-transition--previous {
+  animation-name: gg-calendar-enter-previous;
+}
+
+.manager-shell .manager-schedule-page .calendar-period-transition--fade {
+  animation-name: gg-calendar-enter-fade;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .manager-shell .manager-schedule-page .calendar-period-transition {
+    animation: none;
+  }
+}
+
+.manager-shell .manager-schedule-page {
+  grid-template-rows: auto minmax(0, 1fr);
+  height: calc(100dvh - clamp(40px, 4.4vw, 64px));
+  min-height: 0;
+  gap: var(--gg-space-3);
+  overflow: hidden;
+}
+
+.manager-shell .manager-schedule-page .gg-page-header__copy .gg-eyebrow {
+  margin-bottom: var(--gg-space-1);
+}
+
+.manager-shell .manager-schedule-page .gg-page-header__copy h1 {
+  font-size: clamp(1.55rem, 2.4vw, 1.9rem);
+}
+
+.manager-shell .manager-schedule-page .gg-page-header__copy > p:last-child {
+  margin-top: var(--gg-space-1);
+  line-height: 1.35;
+}
+
 .manager-shell .manager-schedule-page .calendar-controls {
   gap: var(--gg-space-2);
 }
@@ -2035,6 +2341,8 @@
 .manager-shell .manager-schedule-page .calendar-content {
   grid-template-columns: minmax(0, 1fr) 240px;
   gap: var(--gg-space-5);
+  min-height: 0;
+  height: 100%;
   max-width: none;
   margin: 0;
 }
@@ -2049,16 +2357,83 @@
 }
 
 .manager-shell .manager-schedule-page .calendar-main {
-  padding: var(--gg-space-6);
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
+  padding: var(--gg-space-4);
+  overflow: hidden;
   border-radius: var(--gg-radius-lg);
 }
 
+.manager-shell .manager-schedule-page .calendar-main--interactive {
+  touch-action: pan-y;
+  overscroll-behavior-x: contain;
+}
+
+.manager-shell .manager-schedule-page .calendar-main--interactive button,
+.manager-shell .manager-schedule-page .calendar-main--interactive select {
+  cursor: pointer;
+}
+
 .manager-shell .manager-schedule-page .calendar-week-info {
+  gap: var(--gg-space-4);
+  flex: 0 0 auto;
+  margin-bottom: var(--gg-space-3);
+  padding-bottom: var(--gg-space-3);
   border-bottom-color: var(--gg-color-border);
+}
+
+.manager-shell .manager-schedule-page .calendar-week-info > div {
+  display: grid;
+  gap: 3px;
 }
 
 .manager-shell .manager-schedule-page .calendar-month-year {
   color: var(--gg-color-text);
+}
+
+.manager-shell .manager-schedule-page .calendar-week-range {
+  color: var(--gg-color-text-muted);
+  font-size: var(--gg-text-sm);
+}
+
+.manager-shell .manager-schedule-page .calendar-week-summary {
+  justify-items: end;
+}
+
+.manager-shell .manager-schedule-page .calendar-week-summary > span:first-child {
+  color: var(--gg-color-text-muted);
+  font-size: var(--gg-text-sm);
+}
+
+.manager-shell .manager-schedule-page .calendar-week-summary strong {
+  color: var(--gg-color-text);
+  font-size: var(--gg-text-md);
+}
+
+.manager-shell .manager-schedule-page .calendar-gesture-hint {
+  display: none;
+  color: var(--gg-color-text-muted);
+  font-size: .68rem;
+  font-weight: 600;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .manager-shell .manager-schedule-page .calendar-gesture-hint { display: inline; }
+}
+
+.manager-shell .manager-schedule-page .calendar-empty-notice {
+  flex: 0 0 auto;
+  margin-bottom: var(--gg-space-3);
+  border: 1px dashed var(--gg-color-border-strong);
+  border-radius: var(--gg-radius-md);
+  background: var(--gg-color-surface-subtle);
+}
+
+.manager-shell .manager-schedule-page .calendar-empty-notice .gg-empty-state {
+  min-height: 0;
+  padding: var(--gg-space-3);
 }
 
 .manager-shell .manager-schedule-page .calendar-week-number,
@@ -2068,8 +2443,58 @@
 }
 
 .manager-shell .manager-schedule-page .calendar-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  padding-top: 0;
   border: 1px solid var(--gg-color-border);
   background: var(--gg-color-surface-subtle);
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
+.manager-shell .manager-schedule-page .calendar-days-grid {
+  min-width: 840px;
+}
+
+.manager-shell .manager-schedule-page .calendar-time-column {
+  position: sticky;
+  left: 0;
+  z-index: 12;
+  padding-top: 0;
+}
+
+.manager-shell .manager-schedule-page .calendar-time-header {
+  position: sticky;
+  top: 0;
+  z-index: 14;
+  display: flex;
+  height: 72px;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--gg-color-border);
+  background: var(--gg-color-surface-subtle);
+  color: var(--gg-color-text-muted);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.manager-shell .manager-schedule-page .calendar-day-headers {
+  position: sticky;
+  top: 0;
+  z-index: 11;
+  min-height: 72px;
+  align-items: center;
+  padding: var(--gg-space-3) 0;
+  margin: 0;
+  box-shadow: 0 1px 0 var(--gg-color-border);
+}
+
+.manager-shell .manager-schedule-page .calendar-grid:focus-visible {
+  outline: 3px solid var(--gg-color-focus-ring);
+  outline-offset: 3px;
 }
 
 .manager-shell .manager-schedule-page .calendar-grid::before,
@@ -2115,11 +2540,41 @@
 }
 
 .manager-shell .manager-schedule-page .calendar-event {
+  display: grid;
+  align-content: center;
+  gap: 2px;
   border-color: var(--gg-color-border-accent);
   border-left-color: var(--gg-color-primary-text);
   background: var(--gg-color-primary-soft-strong);
   box-shadow: var(--gg-shadow-sm);
   color: var(--gg-color-primary-text);
+  white-space: normal;
+  font-family: inherit;
+  text-align: left;
+}
+
+.manager-shell .manager-schedule-page .calendar-event:focus-visible {
+  z-index: 13;
+  outline: 3px solid var(--gg-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.manager-shell .manager-schedule-page .calendar-event strong,
+.manager-shell .manager-schedule-page .calendar-event span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manager-shell .manager-schedule-page .calendar-event strong {
+  font-size: .75rem;
+  line-height: 1.2;
+}
+
+.manager-shell .manager-schedule-page .calendar-event span {
+  color: color-mix(in srgb, var(--gg-color-primary-text) 78%, var(--gg-color-text-muted));
+  font-size: .65rem;
+  font-weight: 600;
 }
 
 .manager-shell .manager-schedule-page .calendar-event:hover {
@@ -2128,9 +2583,129 @@
   transform: translateY(-1px);
 }
 
+.manager-shell .manager-schedule-page .calendar-month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(110px, 1fr));
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  border: 1px solid var(--gg-color-border);
+  border-radius: var(--gg-radius-md);
+  background: var(--gg-color-border);
+  gap: 1px;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
+.manager-shell .manager-schedule-page .calendar-month-weekday {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  padding: var(--gg-space-3);
+  background: var(--gg-color-surface-subtle);
+  color: var(--gg-color-text-muted);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-align: center;
+}
+
+.manager-shell .manager-schedule-page .calendar-month-day {
+  min-height: 132px;
+  padding: var(--gg-space-2);
+  background: var(--gg-color-surface);
+}
+
+.manager-shell .manager-schedule-page .calendar-month-day.is-empty {
+  background: var(--gg-color-surface-subtle);
+}
+
+.manager-shell .manager-schedule-page .calendar-month-day.is-selected {
+  box-shadow: inset 0 0 0 2px var(--gg-color-primary-text);
+}
+
+.manager-shell .manager-schedule-page .calendar-month-date {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  margin-left: auto;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--gg-color-text);
+  font: inherit;
+  font-size: var(--gg-text-sm);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.manager-shell .manager-schedule-page .calendar-month-date:hover {
+  background: var(--gg-color-primary-soft);
+  color: var(--gg-color-primary-text);
+}
+
+.manager-shell .manager-schedule-page .calendar-month-date:focus-visible {
+  outline: 3px solid var(--gg-color-focus-ring);
+  outline-offset: 1px;
+}
+
+.manager-shell .manager-schedule-page .calendar-month-day.is-today .calendar-month-date {
+  background: var(--gg-color-primary);
+  color: var(--gg-color-primary-contrast);
+}
+
+.manager-shell .manager-schedule-page .calendar-month-events {
+  display: grid;
+  gap: 4px;
+  margin-top: var(--gg-space-2);
+}
+
+.manager-shell .manager-schedule-page .calendar-month-event {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px;
+  padding: 5px 7px;
+  border-left: 3px solid var(--gg-color-primary-text);
+  border-radius: var(--gg-radius-sm);
+  background: var(--gg-color-primary-soft);
+  color: var(--gg-color-text);
+  font-family: inherit;
+  font-size: .68rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.manager-shell .manager-schedule-page .calendar-month-event:hover {
+  background: var(--gg-color-primary-soft-strong);
+}
+
+.manager-shell .manager-schedule-page .calendar-month-event:focus-visible {
+  outline: 3px solid var(--gg-color-focus-ring);
+  outline-offset: 1px;
+}
+
+.manager-shell .manager-schedule-page .calendar-month-event span {
+  color: var(--gg-color-text-muted);
+}
+
+.manager-shell .manager-schedule-page .calendar-month-event strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manager-shell .manager-schedule-page .calendar-month-more {
+  padding-left: var(--gg-space-2);
+  color: var(--gg-color-primary-text);
+  font-size: .7rem;
+  font-weight: 750;
+}
+
 .manager-shell .manager-schedule-page .calendar-mini {
   top: var(--gg-space-5);
-  padding: var(--gg-space-4);
+  padding: var(--gg-space-3);
   border-radius: var(--gg-radius-lg);
 }
 
@@ -2183,8 +2758,23 @@
 }
 
 @media (max-width: 1200px) {
+  .manager-shell .manager-schedule-page {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
   .manager-shell .manager-schedule-page .calendar-content {
     grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .manager-shell .manager-schedule-page .calendar-main { height: auto; }
+
+  .manager-shell .manager-schedule-page .calendar-grid,
+  .manager-shell .manager-schedule-page .calendar-month-grid {
+    min-height: 460px;
+    max-height: min(68vh, 700px);
   }
 
   .manager-shell .manager-schedule-page .calendar-mini {

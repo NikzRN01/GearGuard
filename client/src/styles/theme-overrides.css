@@ -11,43 +11,160 @@ body {
   transition: background-color var(--gg-duration-normal) var(--gg-ease-standard), color var(--gg-duration-normal) var(--gg-ease-standard);
 }
 
-/* Theme changes use a restrained cross-fade instead of letting hundreds of
-   token-driven surfaces snap at once. The temporary fallback class exists
-   only for browsers without the View Transitions API. */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 280ms;
-  animation-timing-function: var(--gg-ease-standard);
+/* Mechanical theme transition: paired gears rotate in opposite directions. */
+.gg-theme-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: grid;
+  place-items: center;
+  background: rgba(2, 2, 2, .28);
+  color: #b2d5e5;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  backdrop-filter: blur(6px) saturate(.88);
+  -webkit-backdrop-filter: blur(6px) saturate(.88);
 }
 
-::view-transition-old(root) { animation-name: gg-theme-old; }
-::view-transition-new(root) { animation-name: gg-theme-new; }
-
-@keyframes gg-theme-old {
-  from { opacity: 1; }
-  to { opacity: 0; }
+html.gg-theme-transitioning .gg-theme-loader {
+  visibility: visible;
+  animation: gg-theme-loader-enter 520ms var(--gg-ease-emphasized) both;
 }
 
-@keyframes gg-theme-new {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.gg-theme-loader__gears {
+  position: relative;
+  width: 116px;
+  height: 96px;
+  filter: drop-shadow(0 18px 30px rgba(2, 2, 2, .28));
 }
 
-html.gg-theme-transitioning *,
-html.gg-theme-transitioning *::before,
-html.gg-theme-transitioning *::after {
-  transition-property: color, background-color, border-color, box-shadow, fill, stroke !important;
-  transition-duration: 280ms !important;
+.gg-theme-loader__gear {
+  position: absolute;
+  display: block;
+  overflow: visible;
+  fill: currentColor;
+  filter: drop-shadow(0 0 10px rgba(178, 213, 229, .28));
+  transform-origin: center;
+}
+
+.gg-theme-loader__gear--main {
+  top: 0;
+  left: 0;
+  width: 88px;
+  height: 88px;
+}
+
+.gg-theme-loader__gear--pinion {
+  right: 0;
+  bottom: 0;
+  width: 48px;
+  height: 48px;
+}
+
+html.gg-theme-transitioning .gg-theme-loader__gear--main {
+  animation: gg-theme-gear-forward 520ms cubic-bezier(.3, .75, .25, 1) both;
+}
+
+html.gg-theme-transitioning .gg-theme-loader__gear--pinion {
+  animation: gg-theme-gear-reverse 520ms cubic-bezier(.3, .75, .25, 1) both;
+}
+
+html.gg-theme-to-light .gg-theme-loader {
+  background: rgba(234, 242, 244, .34);
+  color: #246a86;
+}
+
+html.gg-theme-to-light .gg-theme-loader__gear { filter: drop-shadow(0 0 10px rgba(36, 106, 134, .22)); }
+
+@keyframes gg-theme-loader-enter {
+  0% { opacity: 0; }
+  20%, 76% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes gg-theme-gear-forward {
+  from { transform: rotate(-35deg) scale(.82); }
+  to { transform: rotate(325deg) scale(1); }
+}
+
+@keyframes gg-theme-gear-reverse {
+  from { transform: rotate(45deg) scale(.78); }
+  to { transform: rotate(-495deg) scale(1); }
+}
+
+
+/* Animate only major painted surfaces. The previous universal selector forced
+   every node and pseudo-element through style, paint, and compositing work. */
+html.gg-theme-transitioning body,
+html.gg-theme-transitioning .app-main,
+html.gg-theme-transitioning .app-sidebar,
+html.gg-theme-transitioning .gg-panel,
+html.gg-theme-transitioning .gg-alert,
+html.gg-theme-transitioning .gg-button,
+html.gg-theme-transitioning .manager-theme-toggle,
+html.gg-theme-transitioning .public-theme-toggle,
+html.gg-theme-transitioning .auth-shell,
+html.gg-theme-transitioning .auth-card,
+html.gg-theme-transitioning .landing-copy,
+html.gg-theme-transitioning .landing-highlight-card,
+html.gg-theme-transitioning .landing-feature-card,
+html.gg-theme-transitioning .landing-metric-card,
+html.gg-theme-transitioning .landing-step,
+html.gg-theme-transitioning .manager-sidebar a,
+html.gg-theme-transitioning .manager-sidebar summary,
+html.gg-theme-transitioning .manager-sidebar__mark,
+html.gg-theme-transitioning .manager-sidebar__brand-copy strong,
+html.gg-theme-transitioning .manager-sidebar__brand-copy span,
+html.gg-theme-transitioning .manager-sidebar__group-label,
+html.gg-theme-transitioning .manager-sidebar__user strong,
+html.gg-theme-transitioning .manager-sidebar__user span,
+html.gg-theme-transitioning .manager-sidebar .sidebar-logout,
+html.gg-theme-transitioning input,
+html.gg-theme-transitioning select,
+html.gg-theme-transitioning textarea {
+  transition-property: color, background-color, border-color !important;
+  transition-duration: 240ms !important;
   transition-timing-function: var(--gg-ease-standard) !important;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-old(root),
-  ::view-transition-new(root) { animation: none; }
+html.gg-theme-transitioning .manager-sidebar,
+html.gg-theme-transitioning .manager-sidebar a,
+html.gg-theme-transitioning .manager-sidebar summary,
+html.gg-theme-transitioning .manager-sidebar__mark,
+html.gg-theme-transitioning .manager-sidebar__brand-copy strong,
+html.gg-theme-transitioning .manager-sidebar__brand-copy span,
+html.gg-theme-transitioning .manager-sidebar__group-label,
+html.gg-theme-transitioning .manager-sidebar__user strong,
+html.gg-theme-transitioning .manager-sidebar__user span,
+html.gg-theme-transitioning .manager-sidebar .sidebar-logout,
+html.gg-theme-transitioning .manager-theme-toggle {
+  transition-property: color, background-color, border-color, box-shadow !important;
+  transition-duration: 360ms !important;
+}
 
-  html.gg-theme-transitioning *,
-  html.gg-theme-transitioning *::before,
-  html.gg-theme-transitioning *::after { transition-duration: 0.01ms !important; }
+@media (prefers-reduced-motion: reduce) {
+  html.gg-theme-transitioning .gg-theme-loader { display: none; animation: none; }
+  .manager-sidebar.app-sidebar::before { transition-duration: 0.01ms !important; }
+
+  html.gg-theme-transitioning body,
+  html.gg-theme-transitioning .app-main,
+  html.gg-theme-transitioning .app-sidebar,
+  html.gg-theme-transitioning .gg-panel,
+  html.gg-theme-transitioning .gg-alert,
+  html.gg-theme-transitioning .gg-button,
+  html.gg-theme-transitioning .manager-sidebar a,
+  html.gg-theme-transitioning .manager-sidebar summary,
+  html.gg-theme-transitioning .manager-sidebar__mark,
+  html.gg-theme-transitioning .manager-sidebar__brand-copy strong,
+  html.gg-theme-transitioning .manager-sidebar__brand-copy span,
+  html.gg-theme-transitioning .manager-sidebar__group-label,
+  html.gg-theme-transitioning .manager-sidebar__user strong,
+  html.gg-theme-transitioning .manager-sidebar__user span,
+  html.gg-theme-transitioning .manager-sidebar .sidebar-logout,
+  html.gg-theme-transitioning input,
+  html.gg-theme-transitioning select,
+  html.gg-theme-transitioning textarea { transition-duration: 0.01ms !important; }
 }
 
 .public-theme-toggle {
@@ -221,7 +338,31 @@ html.gg-theme-transitioning *::after {
   --gg-color-text-secondary: #d7e6ec;
   --gg-color-text-muted: #a9c4d0;
   --gg-color-primary-text: var(--gg-candy-blue);
+  background: #0b0e10;
+}
+
+.manager-sidebar.app-sidebar {
+  isolation: isolate;
+}
+
+.manager-sidebar.app-sidebar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
   background: linear-gradient(180deg, var(--gg-blue-900), #071f2a);
+  opacity: 0;
+  transition: opacity 360ms var(--gg-ease-standard);
+}
+
+:root[data-theme='light'] .manager-sidebar.app-sidebar::before {
+  opacity: 1;
+}
+
+.manager-sidebar.app-sidebar > * {
+  position: relative;
+  z-index: 1;
 }
 
 :root[data-theme='light'] .manager-sidebar a.active {
