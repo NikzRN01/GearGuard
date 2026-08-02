@@ -1,8 +1,9 @@
 /**
- * The auth screens carry a dotted background surface. It disappeared once
- * before, because the component was passed `lightOnly` while the app resolved
- * to a dark theme - in that combination it renders nothing at all, so the
- * screen just looks flat with no error anywhere to explain it.
+ * The auth screens carry a DotField background. It disappeared once before,
+ * when the previous surface was restricted to the light theme while the app
+ * resolved to dark - it then rendered nothing at all, so the screen just looked
+ * flat with no error anywhere to explain it. These tests hold the background to
+ * being present regardless of theme, and to staying out of the pointer path.
  */
 import React from 'react';
 import { render, screen } from '@testing-library/react';
@@ -31,26 +32,30 @@ const mount = (path = '/login') =>
 afterEach(() => { resolvedTheme = 'light'; });
 
 describe('AuthCard background surface', () => {
-  it.each(['light', 'dark'])('renders the dotted surface in the %s theme', (theme) => {
+  it.each(['light', 'dark', undefined])('renders the background with theme=%s', (theme) => {
     resolvedTheme = theme;
     const { container } = mount();
-    expect(container.querySelector('.auth-dotted-surface')).toBeInTheDocument();
-  });
-
-  it('renders the surface before the theme has resolved', () => {
-    resolvedTheme = undefined;
-    const { container } = mount();
-    // The element must exist immediately; only the WebGL scene waits for a
-    // resolved theme. Otherwise the background pops in after first paint.
-    expect(container.querySelector('.auth-dotted-surface')).toBeInTheDocument();
-  });
-
-  it('keeps the surface behind the content and out of the pointer path', () => {
-    const { container } = mount();
     const surface = container.querySelector('.auth-dotted-surface');
-    // A background that swallows clicks would break the sign-in form.
-    expect(surface.className).toMatch(/pointer-events-none/);
-    expect(surface.className).toMatch(/fixed/);
+    expect(surface).toBeInTheDocument();
+    // DotField draws to a canvas; if the element is there but the canvas is
+    // not, the backdrop is an empty box.
+    expect(surface.querySelector('canvas')).toBeInTheDocument();
+  });
+
+  it('mounts the backdrop with the full-bleed frame DotField measures against', () => {
+    // DotField sizes its canvas from the parent's rect, so the wrapper class
+    // that supplies `position: fixed; inset: 0` is load-bearing, not cosmetic.
+    const { container } = mount();
+    expect(container.querySelector('.dot-field-backdrop.auth-dotted-surface')).toBeInTheDocument();
+  });
+
+  it('keeps the backdrop out of the pointer path and away from assistive tech', () => {
+    // A background that swallows clicks would break the sign-in form, and
+    // DotField's own canvas carries no pointer-events rule of its own.
+    const { container } = mount();
+    const surface = container.querySelector('.dot-field-backdrop');
+    expect(surface).toHaveAttribute('aria-hidden', 'true');
+    expect(surface.className).toMatch(/dot-field-backdrop/);
   });
 
   it('still renders the card content around it', () => {

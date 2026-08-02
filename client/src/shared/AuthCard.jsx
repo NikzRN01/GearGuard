@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import DottedSurface from '@/components/ui/dotted-surface';
+import DotFieldBackground from '@/components/ui/DotFieldBackground';
 
 export default function AuthCard({ title, subtitle, children, className }) {
   const { pathname } = useLocation();
@@ -8,10 +8,7 @@ export default function AuthCard({ title, subtitle, children, className }) {
 
   return (
     <div className="auth-layout">
-      {/* Renders in both themes: the surface already picks its own dot colour
-          per theme, so restricting it to light left the dark auth screen with a
-          flat background. 0.12 was also faint enough to read as "missing". */}
-      <DottedSurface className="auth-dotted-surface" size={5} opacity={0.28} />
+      <DotFieldBackground className="auth-dotted-surface" />
       <main className="auth-shell">
         <section className="auth-brand-panel" aria-label="GearGuard product information">
           <div className="auth-brand-lockup">

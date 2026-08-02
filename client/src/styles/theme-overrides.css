@@ -41,6 +41,17 @@ body {
 .landing-layout > :not(.landing-dotted-surface) { position: relative; z-index: 1; }
 .landing-dotted-surface { z-index: 0; overflow: hidden; }
 .landing-dotted-surface canvas { display: block; width: 100%; height: 100%; }
+
+/* Full-bleed frame for the DotField backdrop. DotField measures its parent, so
+   this is what tells it to cover the viewport rather than a content box, and
+   pointer-events must stay off or the canvas intercepts clicks on the form. */
+.dot-field-backdrop {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+.dot-field-backdrop canvas,
+.dot-field-backdrop svg { pointer-events: none; }
 .auth-layout { position: relative; isolation: isolate; }
 .auth-layout > :not(.auth-dotted-surface) { position: relative; z-index: 1; }
 .auth-dotted-surface { z-index: 0; overflow: hidden; }
@@ -85,14 +96,10 @@ body {
     linear-gradient(180deg, #f1f4f3 0%, #e9efef 52%, #f0f3f2 100%);
 }
 
-:root[data-theme='light'] .landing-nav {
-  padding: 10px 14px;
-  border: 1px solid rgba(174, 190, 197, 0.62);
-  border-radius: var(--gg-radius-lg);
-  background: rgba(244, 247, 246, 0.82);
-  box-shadow: 0 8px 24px rgba(11, 47, 64, 0.055);
-  backdrop-filter: blur(16px);
-}
+/* The landing nav deliberately has no panel of its own in either theme: it sits
+   directly on the page so the dot field reads as one continuous background.
+   Light mode used to add a bordered, blurred card here, which boxed the header
+   off from the rest of the page and interrupted the field behind it. */
 
 :root[data-theme='light'] .landing-copy,
 :root[data-theme='light'] .landing-highlight-card,

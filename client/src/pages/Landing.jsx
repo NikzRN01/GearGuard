@@ -1,11 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import DottedSurface from '@/components/ui/dotted-surface';
+import DotFieldBackground from '@/components/ui/DotFieldBackground';
 
 export default function Landing() {
   return (
     <div className="landing-layout">
-      <DottedSurface className="landing-dotted-surface" size={6} opacity={0.18} lightOnly />
+      <DotFieldBackground className="landing-dotted-surface" />
       <div className="auth-backdrop">
         <span className="orb orb-a" />
         <span className="orb orb-b" />
