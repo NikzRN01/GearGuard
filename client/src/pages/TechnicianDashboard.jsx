@@ -8,13 +8,9 @@ import Input from '../components/ui/Input';
 import PageHeader from '../components/ui/PageHeader';
 import Panel from '../components/ui/Panel';
 import StatusBadge from '../components/ui/StatusBadge';
+import { todayKey } from '../services/datetime';
+import { dateKey, isOpen, isOverdue } from '../services/workload';
 
-const CLOSED_STATUSES = new Set(['repaired', 'scrap', 'completed', 'closed']);
-const dateKey = (value) => value ? String(value).slice(0, 10) : '';
-const todayKey = () => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-};
 const formatDate = (value) => {
   const key = dateKey(value);
   if (!key) return 'Unscheduled';
@@ -65,10 +61,10 @@ const TechnicianDashboard = () => {
   }, [user?.id, load]);
 
   const stats = useMemo(() => {
-    const open = requests.filter((request) => !CLOSED_STATUSES.has(String(request.status || '').toLowerCase()));
+    const open = requests.filter(isOpen);
     const inProgress = open.filter(r => String(r.status || '').toLowerCase() === 'in_progress').length;
     const pending = open.filter(r => String(r.status || '').toLowerCase() === 'new').length;
-    const overdue = open.filter((request) => request.scheduled_date && dateKey(request.scheduled_date) < todayKey()).length;
+    const overdue = open.filter((request) => isOverdue(request)).length;
     
     return { open: open.length, inProgress, pending, overdue };
   }, [requests]);
@@ -155,7 +151,7 @@ const TechnicianDashboard = () => {
                   <td data-label="Equipment">{request.equipment_name || '-'}</td>
                   <td data-label="Type">{request.type || '-'}</td>
                   <td data-label="Status"><StatusBadge status={request.status} /></td>
-                  <td data-label="Scheduled date" className={request.scheduled_date && dateKey(request.scheduled_date) < todayKey() && !CLOSED_STATUSES.has(String(request.status).toLowerCase()) ? 'technician-overdue-date' : ''}>{formatDate(request.scheduled_date)}</td>
+                  <td data-label="Scheduled date" className={isOverdue(request) ? 'technician-overdue-date' : ''}>{formatDate(request.scheduled_date)}</td>
                   <td className="tech-action-cell">
                     <Button variant="tertiary" size="small" onClick={() => navigate(`/app/requests?request_id=${request.id}`)}>View task</Button>
                   </td>

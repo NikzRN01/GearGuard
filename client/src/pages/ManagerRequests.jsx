@@ -10,16 +10,10 @@ import StatusBadge from '../components/ui/StatusBadge';
 import SelectMenu from '../components/ui/SelectMenu';
 import Field from '../components/ui/Field';
 import Input from '../components/ui/Input';
-import { formatTimestamp } from '../services/datetime';
+import { formatTimestamp, todayKey } from '../services/datetime';
 import { getSessionUser } from '../services/session';
+import { ASSIGNABLE_ROLES, dateKey, isAssignedTo, isOpen, isOverdue, isUnassigned } from '../services/workload';
 
-const CLOSED_STATUSES = new Set(['repaired', 'scrap', 'completed', 'closed']);
-const isOpen = (request) => !CLOSED_STATUSES.has(String(request.status || '').toLowerCase());
-const dateKey = (value) => value ? String(value).slice(0, 10) : '';
-const todayKey = () => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-};
 const formatSchedule = (value) => {
   const key = dateKey(value);
   if (!key) return 'Unscheduled';
@@ -62,7 +56,7 @@ export default function ManagerRequests() {
         api.get('/teams/users/all')
       ]);
       setRequests(requestResponse?.data?.data || []);
-      setUsers((userResponse?.data?.data || []).filter((user) => ['technician', 'manager'].includes(user.role)));
+      setUsers((userResponse?.data?.data || []).filter((user) => ASSIGNABLE_ROLES.includes(user.role)));
     } catch (err) {
       setError(err?.response?.data?.message || 'Unable to load maintenance requests.');
     } finally {
@@ -98,33 +92,72 @@ export default function ManagerRequests() {
     const search = (searchParams.get('search') || '').trim().toLowerCase();
     const status = searchParams.get('status') || '';
     const view = searchParams.get('view') || '';
+    // Matched against assigned_to_user_id, not the assignee's name: a name-based
+    // text search also hits subjects, teams and assets, so the count on a
+    // workload row would not match the list it links to.
+    const assignee = searchParams.get('assignee') || '';
+    // Same reasoning for the asset: matched on equipment_id, because a name
+    // search also hit other assets whose names contained this one.
+    const equipment = searchParams.get('equipment') || '';
     const today = todayKey();
     return requests.filter((request) => {
       if (status && request.status !== status) return false;
-      if (view === 'unassigned' && (!isOpen(request) || request.assigned_to_user_id)) return false;
-      if (view === 'overdue' && (!isOpen(request) || !request.scheduled_date || dateKey(request.scheduled_date) >= today)) return false;
+      if (assignee && !isAssignedTo(request, assignee)) return false;
+      if (equipment && Number(request.equipment_id) !== Number(equipment)) return false;
+      if (view === 'open' && !isOpen(request)) return false;
+      if (view === 'unassigned' && !isUnassigned(request)) return false;
+      if (view === 'overdue' && !isOverdue(request, today)) return false;
       if (!search) return true;
       return [request.subject, request.equipment_name, request.work_center_name, request.team_name, request.assigned_to_name, request.status]
         .filter(Boolean).join(' ').toLowerCase().includes(search);
     });
   }, [requests, searchParams]);
 
+  /**
+   * What the id-based filters are narrowing to, named for the results readout -
+   * without it the queue would silently show a subset with nothing on screen
+   * explaining why.
+   */
+  const filterSubject = useMemo(() => {
+    const parts = [];
+
+    const assignee = searchParams.get('assignee');
+    if (assignee) {
+      const match = users.find((user) => String(user.id) === String(assignee))
+        || requests.find((request) => isAssignedTo(request, assignee));
+      parts.push(match?.name || match?.assigned_to_name || `user #${assignee}`);
+    }
+
+    const equipment = searchParams.get('equipment');
+    if (equipment) {
+      const match = requests.find((request) => Number(request.equipment_id) === Number(equipment));
+      parts.push(match?.equipment_name || `equipment #${equipment}`);
+    }
+
+    return parts.join(' · ');
+  }, [searchParams, users, requests]);
+
   const requestStats = useMemo(() => {
     const today = todayKey();
     return {
       all: requests.length,
-      unassigned: requests.filter((request) => isOpen(request) && !request.assigned_to_user_id).length,
-      overdue: requests.filter((request) => isOpen(request) && request.scheduled_date && dateKey(request.scheduled_date) < today).length,
+      unassigned: requests.filter(isUnassigned).length,
+      overdue: requests.filter((request) => isOverdue(request, today)).length,
       inProgress: requests.filter((request) => request.status === 'in_progress').length
     };
   }, [requests]);
 
-  const activeFilterCount = ['search', 'status', 'view'].filter((key) => searchParams.get(key)).length;
+  const activeFilterCount = ['search', 'status', 'view', 'assignee', 'equipment'].filter((key) => searchParams.get(key)).length;
 
+  // The quick views report counts across the whole queue, so they clear the
+  // person and asset filters rather than silently showing a subset of the
+  // number on the tab.
   const applyQuickView = (view) => {
     const next = new URLSearchParams(searchParams);
     next.delete('view');
     next.delete('status');
+    next.delete('assignee');
+    next.delete('equipment');
     if (view === 'unassigned' || view === 'overdue') next.set('view', view);
     if (view === 'in_progress') next.set('status', 'in_progress');
     setSearchParams(next, { replace: true });
@@ -213,11 +246,11 @@ export default function ManagerRequests() {
         <div className="manager-filter-heading"><div><span>Find maintenance work</span><small>{activeFilterCount ? `${activeFilterCount} active filter${activeFilterCount === 1 ? '' : 's'}` : 'Showing the full request queue'}</small></div></div>
         <Field label="Search"><Input type="search" value={searchParams.get('search') || ''} onChange={(event) => updateParam('search', event.target.value)} placeholder="Request, asset, team..." /></Field>
         <div className="manager-filter-field"><span>Status</span><SelectMenu ariaLabel="Filter by status" value={searchParams.get('status') || ''} onChange={(value) => updateParam('status', value)} options={[{ value: '', label: 'All statuses' }, { value: 'new', label: 'New' }, { value: 'in_progress', label: 'In progress' }, { value: 'repaired', label: 'Repaired' }, { value: 'scrap', label: 'Scrapped' }]} /></div>
-        <div className="manager-filter-field"><span>Attention</span><SelectMenu ariaLabel="Filter by attention" value={searchParams.get('view') || ''} onChange={(value) => updateParam('view', value)} options={[{ value: '', label: 'All requests' }, { value: 'unassigned', label: 'Unassigned' }, { value: 'overdue', label: 'Overdue' }]} /></div>
+        <div className="manager-filter-field"><span>Attention</span><SelectMenu ariaLabel="Filter by attention" value={searchParams.get('view') || ''} onChange={(value) => updateParam('view', value)} options={[{ value: '', label: 'All requests' }, { value: 'open', label: 'Open only' }, { value: 'unassigned', label: 'Unassigned' }, { value: 'overdue', label: 'Overdue' }]} /></div>
         <Button variant="secondary" disabled={activeFilterCount === 0} onClick={() => setSearchParams({}, { replace: true })}>Clear filters</Button>
       </div>
 
-      <p className="manager-filter-results" role="status" aria-live="polite">{loading ? 'Loading request queue.' : `${filtered.length} request${filtered.length === 1 ? '' : 's'} shown.`}</p>
+      <p className="manager-filter-results" role="status" aria-live="polite">{loading ? 'Loading request queue.' : `${filtered.length} request${filtered.length === 1 ? '' : 's'} shown${filterSubject ? ` for ${filterSubject}` : ''}.`}</p>
 
       {error && <Alert tone="danger" title="Request action failed">{error}</Alert>}
 
@@ -238,8 +271,8 @@ export default function ManagerRequests() {
                   <div className="manager-row-meta">
                     <div className="manager-row-badges">
                       <StatusBadge status={request.status || 'new'} />
-                      {isOpen(request) && !request.assigned_to_user_id && <StatusBadge tone="warning">Unassigned</StatusBadge>}
-                      {isOpen(request) && request.scheduled_date && dateKey(request.scheduled_date) < todayKey() && <StatusBadge tone="danger">Overdue</StatusBadge>}
+                      {isUnassigned(request) && <StatusBadge tone="warning">Unassigned</StatusBadge>}
+                      {isOverdue(request) && <StatusBadge tone="danger">Overdue</StatusBadge>}
                     </div>
                     <span>{formatSchedule(request.scheduled_date)}</span>
                   </div>

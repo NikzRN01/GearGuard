@@ -7,23 +7,9 @@ import EmptyState from '../components/ui/EmptyState';
 import PageHeader from '../components/ui/PageHeader';
 import Panel from '../components/ui/Panel';
 import StatusBadge from '../components/ui/StatusBadge';
+import { todayKey } from '../services/datetime';
+import { WORKLOAD_SCOPE_NOTE, dateKey, isOpen, isOverdue, isUnassigned, summarizeWorkload } from '../services/workload';
 
-const CLOSED_STATUSES = new Set(['repaired', 'scrap', 'completed', 'closed']);
-
-const dateKey = (value) => {
-  if (!value) return '';
-  return String(value).slice(0, 10);
-};
-
-const todayKey = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const isOpen = (request) => !CLOSED_STATUSES.has(String(request.status || '').toLowerCase());
 const formatSchedule = (value) => {
   const key = dateKey(value);
   if (!key) return 'Unscheduled';
@@ -65,36 +51,20 @@ export default function ManagerOverview() {
   const overview = useMemo(() => {
     const today = todayKey();
     const open = requests.filter(isOpen);
-    const unassigned = open.filter((request) => !request.assigned_to_user_id);
-    const overdue = open.filter((request) => request.scheduled_date && dateKey(request.scheduled_date) < today);
+    const unassigned = open.filter(isUnassigned);
+    const overdue = open.filter((request) => isOverdue(request, today));
     const inProgress = open.filter((request) => String(request.status).toLowerCase() === 'in_progress');
     const scheduledToday = open
       .filter((request) => dateKey(request.scheduled_date) === today)
       .sort((a, b) => String(a.subject).localeCompare(String(b.subject)));
     const attention = [...new Map([...overdue, ...unassigned].map((request) => [request.id, request])).values()]
-      .sort((a, b) => {
-        const aOverdue = Boolean(a.scheduled_date && dateKey(a.scheduled_date) < today);
-        const bOverdue = Boolean(b.scheduled_date && dateKey(b.scheduled_date) < today);
-        return Number(bOverdue) - Number(aOverdue) || String(a.scheduled_date || '9999').localeCompare(String(b.scheduled_date || '9999'));
-      });
+      .sort((a, b) => Number(isOverdue(b, today)) - Number(isOverdue(a, today))
+        || String(a.scheduled_date || '9999').localeCompare(String(b.scheduled_date || '9999')));
 
     return { open, unassigned, overdue, inProgress, scheduledToday, attention };
   }, [requests]);
 
-  const workload = useMemo(() => {
-    const technicians = users.filter((user) => ['technician', 'manager'].includes(user.role));
-    return technicians
-      .map((user) => {
-        const assigned = overview.open.filter((request) => Number(request.assigned_to_user_id) === Number(user.id));
-        return {
-          ...user,
-          active: assigned.length,
-          inProgress: assigned.filter((request) => request.status === 'in_progress').length,
-          overdue: assigned.filter((request) => request.scheduled_date && dateKey(request.scheduled_date) < todayKey()).length
-        };
-      })
-      .sort((a, b) => b.active - a.active || a.name.localeCompare(b.name));
-  }, [overview.open, users]);
+  const workload = useMemo(() => summarizeWorkload(users, overview.open), [overview.open, users]);
 
   if (loading) {
     return <div className="manager-state" role="status">Loading manager workspace...</div>;
@@ -165,7 +135,7 @@ export default function ManagerOverview() {
             </Panel>
           </div>
 
-          <div className="manager-context-note"><strong>Workload scope</strong><span>Counts represent active assigned requests. Capacity, shifts, priority, and verification are not yet modeled.</span></div>
+          <div className="manager-context-note"><strong>Workload scope</strong><span>{WORKLOAD_SCOPE_NOTE}</span></div>
 
           <Panel eyebrow="Team" title="Assigned workload" action={<Button as="link" variant="tertiary" size="small" to="/app/manager/workload">View workload</Button>}>
             {workload.length === 0 ? (

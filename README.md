@@ -260,11 +260,14 @@ Base URL (local): `http://localhost:5000/api`
 
 ## Notes / Limitations
 
-- **The API endpoints are unauthenticated.** Login returns user info only; there
-  is no token or session, and no route checks who the caller is. Role checks in
-  the React app are navigational convenience, not security — anyone who can
-  reach the API can read and modify every record. Add JWT/session handling plus
-  per-route authorization before exposing this to untrusted networks.
+- **The API is authenticated and role-checked server-side.** Login sets an
+  opaque `HttpOnly` session cookie (only its SHA-256 hash is stored); every
+  route outside `/api/auth` runs through `authenticate` + `requireCsrf`, and
+  each router applies `authorize(...)` on top. Row visibility is scoped in SQL,
+  so a technician sees only their assigned requests and a plain user only the
+  ones they raised — query parameters cannot widen it. Role checks in the React
+  app are navigational convenience layered on this, not the boundary itself.
+  See [`server/RBAC.md`](server/RBAC.md) for the full capability matrix.
 - Email reset uses Gmail SMTP; you may need a Gmail **App Password** (recommended) instead of your account password.
 - SQLite is a single-file database. On Vercel it lives in `/tmp` and is wiped on
   every cold start, so deployed data is not durable.
@@ -274,8 +277,8 @@ Base URL (local): `http://localhost:5000/api`
 ## Testing
 
 ```bash
-cd server && npm test    # 135 API, schema, migration and hardening tests
-cd client && npm test    # 26 component and routing tests
+cd server && npm test    # 177 API, schema, migration and hardening tests
+cd client && npm test    # 140 component, service and routing tests
 ```
 
 The server suite runs against a throwaway SQLite file (`SQLITE_DB_PATH`) and a

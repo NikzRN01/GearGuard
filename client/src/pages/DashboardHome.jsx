@@ -7,9 +7,9 @@ import Panel from '../components/ui/Panel';
 import StatusBadge from '../components/ui/StatusBadge';
 import { api } from '../services/api';
 import { formatTimestampDate, parseTimestamp } from '../services/datetime';
+import { isOpen } from '../services/workload';
 
 const statusKey = (status) => String(status || 'new').trim().toLowerCase().replaceAll(' ', '_');
-const isResolved = (status) => ['repaired', 'scrap', 'completed', 'closed'].includes(statusKey(status));
 
 export default function DashboardHome() {
   const navigate = useNavigate();
@@ -34,10 +34,10 @@ export default function DashboardHome() {
   useEffect(() => { load(); }, []);
 
   const stats = useMemo(() => ({
-    open: requests.filter((request) => !isResolved(request.status)).length,
-    awaiting: requests.filter((request) => !isResolved(request.status) && !request.assigned_to_user_id && !request.assigned_to_name).length,
+    open: requests.filter(isOpen).length,
+    awaiting: requests.filter((request) => isOpen(request) && !request.assigned_to_user_id && !request.assigned_to_name).length,
     inProgress: requests.filter((request) => statusKey(request.status) === 'in_progress').length,
-    resolved: requests.filter((request) => isResolved(request.status)).length
+    resolved: requests.filter((request) => !isOpen(request)).length
   }), [requests]);
 
   const visibleRequests = useMemo(() => {
