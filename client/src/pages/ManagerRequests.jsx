@@ -14,7 +14,6 @@ import { formatTimestamp, todayKey } from '../services/datetime';
 import { getSessionUser } from '../services/session';
 import { ASSIGNABLE_ROLES, dateKey, isAssignedTo, isOpen, isOverdue, isUnassigned } from '../services/workload';
 
-const CLOSED_STATUSES = new Set(['repaired', 'scrap', 'completed', 'closed']);
 const formatRole = (role) => String(role || '')
   .replace(/[_-]+/g, ' ')
   .replace(/\b\w/g, (character) => character.toUpperCase());

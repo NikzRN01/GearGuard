@@ -1,6 +1,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const bcrypt = require('bcrypt');
+const { validatePassword } = require('./lib/validation');
 
 // Initialize database
 // SQLITE_DB_PATH lets deployments (and the test suite) point at an alternate file.
@@ -269,6 +270,25 @@ const createNotesTable = () => {
   db.prepare(query).run();
 };
 
+/**
+ * Records who wrote each note.
+ *
+ * Added after the fact, so existing rows keep a NULL author: the information
+ * was never captured and inventing one would put a name against words somebody
+ * else wrote. Readers must render NULL as unknown rather than assume.
+ *
+ * SQLite cannot attach a foreign key through ALTER TABLE, so the reference is
+ * enforced by the route (the author is always the session user) rather than by
+ * the schema.
+ */
+const ensureNotesAuthorColumn = () => {
+  const columns = db.prepare('PRAGMA table_info(notes)').all();
+  if (!columns.some((column) => column.name === 'created_by_user_id')) {
+    db.prepare('ALTER TABLE notes ADD COLUMN created_by_user_id INTEGER').run();
+  }
+  db.prepare('CREATE INDEX IF NOT EXISTS idx_notes_author ON notes(created_by_user_id)').run();
+};
+
 // Create work_centers table (no created_at, location, department per request)
 const createWorkCentersTable = () => {
   const query = `
@@ -311,7 +331,32 @@ const addWorkCenterIdColumn = () => {
   }
 };
 
+/**
+ * Whether this process is serving real users.
+ *
+ * NODE_ENV alone is not enough: forgetting to set it on a deployment is the
+ * exact mistake this check exists to survive, so the platform's own marker
+ * counts too.
+ */
+const isProductionLike = () =>
+  process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
+
+/**
+ * Whether the published-credential demo accounts may be created.
+ *
+ * These accounts use a password that is committed to this repository, so a
+ * deployment that seeds them has an administrator anyone can log into. The
+ * guard is deliberately one-way: production-like environments can never opt
+ * back in, and everywhere else can opt out with SEED_DEMO_DATA=false.
+ */
+const demoSeedAllowed = () => {
+  if (isProductionLike()) return false;
+  return String(process.env.SEED_DEMO_DATA ?? 'true').toLowerCase() !== 'false';
+};
+
 const seedDemoData = () => {
+  if (!demoSeedAllowed()) return;
+
   let demoPasswordHash;
   const teamCount = db.prepare('SELECT COUNT(1) as c FROM teams').get()?.c || 0;
   if (teamCount === 0) {
@@ -374,7 +419,7 @@ const seedDemoData = () => {
 // field and state. Stable natural keys plus INSERT OR IGNORE keep this safe to
 // run on every local boot without duplicating records.
 const seedShowcaseData = () => {
-  if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'production') return;
+  if (process.env.NODE_ENV === 'test' || isProductionLike()) return;
   if (String(process.env.SEED_SHOWCASE_DATA || 'true').toLowerCase() === 'false') return;
 
   const passwordHash = bcrypt.hashSync('Password123!', 10);
@@ -488,6 +533,67 @@ const seedShowcaseData = () => {
   for (const row of auditRows) insertAudit.run(...row, row[1], row[3]);
 };
 
+/**
+ * Creates the first administrator from the environment.
+ *
+ * With the demo seed barred from production, a real deployment needs some way
+ * to obtain its first admin - otherwise nobody can reach the governance screens
+ * and no further accounts can be promoted. Set BOOTSTRAP_ADMIN_EMAIL and
+ * BOOTSTRAP_ADMIN_PASSWORD for the first boot, then remove them.
+ *
+ * Deliberate properties:
+ * - Runs only when the instance has no administrator at all, so it cannot be
+ *   used to silently add a second one later, or to reset an existing account.
+ * - Enforces the same password policy as the signup form, so the bootstrap
+ *   cannot become the weakest credential in the system.
+ * - Never logs the password.
+ */
+const bootstrapAdmin = () => {
+  const existingAdmin = db.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").get();
+  if (existingAdmin) return;
+
+  const email = String(process.env.BOOTSTRAP_ADMIN_EMAIL || '').trim();
+  const password = String(process.env.BOOTSTRAP_ADMIN_PASSWORD || '');
+  const name = String(process.env.BOOTSTRAP_ADMIN_NAME || '').trim() || 'GearGuard Administrator';
+
+  if (!email && !password) {
+    if (isProductionLike()) {
+      console.warn(
+        'No administrator account exists. Set BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD '
+        + 'to create one on the next boot.'
+      );
+    }
+    return;
+  }
+
+  if (!email || !password) {
+    console.error('Admin bootstrap skipped: BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD must both be set.');
+    return;
+  }
+
+  const passwordErrors = validatePassword(password);
+  if (passwordErrors.length > 0) {
+    console.error(`Admin bootstrap skipped: ${passwordErrors.join('. ')}.`);
+    return;
+  }
+
+  // A non-admin may already own this address; promoting it here would be an
+  // unlogged privilege grant, so refuse and let an operator decide.
+  const taken = db.prepare('SELECT id, role FROM users WHERE LOWER(email) = LOWER(?)').get(email);
+  if (taken) {
+    console.error(`Admin bootstrap skipped: ${email} already belongs to a ${taken.role} account.`);
+    return;
+  }
+
+  db.prepare('INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)')
+    .run(name, email, bcrypt.hashSync(password, 10), 'admin');
+
+  console.warn(
+    `Created the first administrator (${email}) from BOOTSTRAP_ADMIN_*. `
+    + 'Remove those variables and change the password after signing in.'
+  );
+};
+
 // Initialize all tables
 const initializeDatabase = () => {
   createUsersTable();
@@ -502,12 +608,16 @@ const initializeDatabase = () => {
   createMaintenanceRequestsTable();
   migrateMaintenanceRequestsTable();
   createNotesTable();
+  ensureNotesAuthorColumn();
   createWorkCentersTable();
   createWorkCenterAlternativesTable();
   // For older DBs only; most are handled by migrateMaintenanceRequestsTable()
   addWorkCenterIdColumn();
   seedDemoData();
   seedShowcaseData();
+  // After seeding: in development the demo seed already supplies an admin, so
+  // this is a no-op there and only does work on a real deployment.
+  bootstrapAdmin();
   console.log('Database initialized successfully');
 };
 

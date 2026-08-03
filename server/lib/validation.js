@@ -198,6 +198,26 @@ function route(handler) {
   };
 }
 
+/**
+ * The account password policy, in one place.
+ *
+ * Signup, password reset and the first-admin bootstrap all enforce this. It
+ * lives here rather than in authRoutes because database.js needs it too, and a
+ * bootstrap admin created under weaker rules than the signup form would be a
+ * hole the form is specifically there to close.
+ */
+function validatePassword(password) {
+  const value = String(password ?? '');
+  const errors = [];
+
+  if (value.length < 8) errors.push('Password must be at least 8 characters long');
+  if (!/[A-Z]/.test(value)) errors.push('Password must contain at least one uppercase letter');
+  if (!/[a-z]/.test(value)) errors.push('Password must contain at least one lowercase letter');
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(value)) errors.push('Password must contain at least one special character');
+
+  return errors;
+}
+
 /** True when a better-sqlite3 error is a UNIQUE constraint violation. */
 const isUniqueViolation = (error) =>
   error && typeof error.code === 'string' && error.code.startsWith('SQLITE_CONSTRAINT') &&
@@ -222,5 +242,6 @@ module.exports = {
   requiredEnum,
   likePattern,
   route,
+  validatePassword,
   isUniqueViolation
 };

@@ -15,7 +15,7 @@ const {
   route,
   isUniqueViolation
 } = require('../lib/validation');
-const { authorize } = require('../middleware/auth');
+const { authorize, audit } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -134,6 +134,11 @@ router.post('/', authorize('manager', 'admin'), route((req, res) => {
     throw error;
   }
 
+  audit(req.user.id, 'workcenter.create', 'work_center', result.lastInsertRowid, {
+    name,
+    code: fields.code ?? null
+  });
+
   res.status(201).json({ success: true, message: 'Work center created', data: { id: result.lastInsertRowid } });
 }));
 
@@ -155,10 +160,13 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
 
   const assignments = [];
   const params = [];
+  const changes = {};
   for (const [column, value] of Object.entries(fields)) {
     if (value === undefined) continue;
     assignments.push(`${column} = ?`);
     params.push(value);
+    // Cost and capacity are commercially meaningful, so record what they were.
+    if (wc[column] !== value) changes[column] = { from: wc[column] ?? null, to: value };
   }
 
   if (assignments.length > 0) {
@@ -171,6 +179,10 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
     }
   }
 
+  if (Object.keys(changes).length > 0) {
+    audit(req.user.id, 'workcenter.update', 'work_center', wc.id, { changes });
+  }
+
   res.json({ success: true, message: 'Work center updated' });
 }));
 
@@ -178,6 +190,12 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
 router.delete('/:id', authorize('manager', 'admin'), route((req, res) => {
   const wc = findWorkCenter(req.params.id);
   db.prepare("UPDATE work_centers SET status = 'inactive' WHERE id = ?").run(wc.id);
+
+  audit(req.user.id, 'workcenter.deactivate', 'work_center', wc.id, {
+    name: wc.name,
+    status: { from: wc.status, to: 'inactive' }
+  });
+
   res.json({ success: true, message: 'Work center deactivated' });
 }));
 
@@ -218,6 +236,10 @@ router.post('/:id/alternatives', authorize('manager', 'admin'), route((req, res)
     throw error;
   }
 
+  audit(req.user.id, 'workcenter.alternative.add', 'work_center', wc.id, {
+    alternative_work_center_id: Number(alternativeId)
+  });
+
   res.status(201).json({ success: true, message: 'Alternative added', data: { id: result.lastInsertRowid } });
 }));
 
@@ -227,11 +249,16 @@ router.delete('/:id/alternatives/:altId', authorize('manager', 'admin'), route((
   if (!workCenterId || !altId) throw notFound('Alternative link not found');
 
   const existing = db
-    .prepare('SELECT id FROM work_center_alternatives WHERE id = ? AND work_center_id = ?')
+    .prepare('SELECT id, alternative_work_center_id FROM work_center_alternatives WHERE id = ? AND work_center_id = ?')
     .get(altId, workCenterId);
   if (!existing) throw notFound('Alternative link not found');
 
   db.prepare('DELETE FROM work_center_alternatives WHERE id = ?').run(altId);
+
+  audit(req.user.id, 'workcenter.alternative.remove', 'work_center', workCenterId, {
+    alternative_work_center_id: existing.alternative_work_center_id
+  });
+
   res.json({ success: true, message: 'Alternative removed' });
 }));
 

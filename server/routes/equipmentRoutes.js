@@ -13,7 +13,7 @@ const {
   route,
   isUniqueViolation
 } = require('../lib/validation');
-const { authorize } = require('../middleware/auth');
+const { authorize, audit } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -140,6 +140,11 @@ router.post('/', authorize('manager', 'admin'), route((req, res) => {
     throw error;
   }
 
+  audit(req.user.id, 'equipment.create', 'equipment', result.lastInsertRowid, {
+    name,
+    serial_number: serialNumber
+  });
+
   res.status(201).json({
     success: true,
     message: 'Equipment created successfully',
@@ -154,7 +159,9 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
   const id = toId(req.params.id);
   if (!id) throw notFound('Equipment not found');
 
-  const existing = db.prepare('SELECT id FROM equipment WHERE id = ?').get(id);
+  // The whole row, not just the id: the audit entry records what each changed
+  // column held before, which is the part an investigation actually needs.
+  const existing = db.prepare('SELECT * FROM equipment WHERE id = ?').get(id);
   if (!existing) throw notFound('Equipment not found');
 
   const fields = parseEquipmentFields(req.body || {});
@@ -177,10 +184,14 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
 
   const assignments = [];
   const params = [];
+  const changes = {};
   for (const [column, value] of Object.entries(fields)) {
     if (value === undefined) continue;
     assignments.push(`${column} = ?`);
     params.push(value);
+    // Only genuinely changed columns are worth recording; the edit form resends
+    // every field on each save, so without this the log would be noise.
+    if (existing[column] !== value) changes[column] = { from: existing[column] ?? null, to: value };
   }
 
   if (assignments.length > 0) {
@@ -195,6 +206,10 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
     }
   }
 
+  if (Object.keys(changes).length > 0) {
+    audit(req.user.id, 'equipment.update', 'equipment', id, { changes });
+  }
+
   res.json({
     success: true,
     message: 'Equipment updated successfully'
@@ -206,7 +221,7 @@ router.delete('/:id', authorize('manager', 'admin'), route((req, res) => {
   const id = toId(req.params.id);
   if (!id) throw notFound('Equipment not found');
 
-  const existing = db.prepare('SELECT id FROM equipment WHERE id = ?').get(id);
+  const existing = db.prepare('SELECT id, name, serial_number FROM equipment WHERE id = ?').get(id);
   if (!existing) throw notFound('Equipment not found');
 
   // Check if equipment has maintenance requests
@@ -218,6 +233,13 @@ router.delete('/:id', authorize('manager', 'admin'), route((req, res) => {
   }
 
   db.prepare('DELETE FROM equipment WHERE id = ?').run(id);
+
+  // Recorded after the fact: once the row is gone the audit entry is the only
+  // remaining trace of what was removed.
+  audit(req.user.id, 'equipment.delete', 'equipment', id, {
+    name: existing.name,
+    serial_number: existing.serial_number
+  });
 
   res.json({
     success: true,

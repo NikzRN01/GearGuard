@@ -213,11 +213,14 @@ router.get('/:id', route((req, res) => {
   if (!request) throw notFound('Maintenance request not found');
   if (!canAccess(req, request)) throw forbidden('You do not have access to this request');
 
-  // Get notes for this request
+  // Get notes for this request. Notes written before authorship was recorded
+  // report a null author rather than being attributed to anyone.
   const notes = db.prepare(`
-    SELECT * FROM notes
-    WHERE request_id = ?
-    ORDER BY created_at DESC, id DESC
+    SELECT n.*, u.name AS created_by_name
+    FROM notes n
+    LEFT JOIN users u ON u.id = n.created_by_user_id
+    WHERE n.request_id = ?
+    ORDER BY n.created_at DESC, n.id DESC
   `).all(id);
 
   res.json({
@@ -422,9 +425,11 @@ router.post('/:id/notes', route((req, res) => {
 
   if (!canAccess(req, request)) throw forbidden('You do not have access to this request');
 
+  // Authorship comes from the session, never the body - the same rule the
+  // request creator follows.
   const result = db
-    .prepare('INSERT INTO notes (request_id, message) VALUES (?, ?)')
-    .run(request.id, message);
+    .prepare('INSERT INTO notes (request_id, message, created_by_user_id) VALUES (?, ?, ?)')
+    .run(request.id, message, req.user.id);
 
   audit(req.user.id, 'maintenance.note.create', 'maintenance_request', request.id, {
     note_id: Number(result.lastInsertRowid)

@@ -268,6 +268,14 @@ Base URL (local): `http://localhost:5000/api`
   ones they raised — query parameters cannot widen it. Role checks in the React
   app are navigational convenience layered on this, not the boundary itself.
   See [`server/RBAC.md`](server/RBAC.md) for the full capability matrix.
+- **Demo accounts never exist in a deployment.** `manager@demo.com`,
+  `admin@demo.com` and friends share a password published in this repository,
+  so the seed is refused outright whenever `NODE_ENV=production` or the platform
+  sets `VERCEL` — and no environment variable can switch it back on. To obtain
+  the first administrator on a real deployment, set `BOOTSTRAP_ADMIN_EMAIL` and
+  `BOOTSTRAP_ADMIN_PASSWORD` for one boot, sign in, change the password, then
+  remove them. The bootstrap only runs when the database has no admin at all, so
+  it cannot add a second one or reset an existing account.
 - Email reset uses Gmail SMTP; you may need a Gmail **App Password** (recommended) instead of your account password.
 - SQLite is a single-file database. On Vercel it lives in `/tmp` and is wiped on
   every cold start, so deployed data is not durable.
@@ -277,8 +285,8 @@ Base URL (local): `http://localhost:5000/api`
 ## Testing
 
 ```bash
-cd server && npm test    # 177 API, schema, migration and hardening tests
-cd client && npm test    # 140 component, service and routing tests
+cd server && npm test    # 205 API, schema, migration and hardening tests
+cd client && npm test    # 150 component, service and routing tests
 ```
 
 The server suite runs against a throwaway SQLite file (`SQLITE_DB_PATH`) and a

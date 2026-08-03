@@ -11,7 +11,7 @@ const {
   route,
   isUniqueViolation
 } = require('../lib/validation');
-const { authorize } = require('../middleware/auth');
+const { authorize, audit } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -108,6 +108,8 @@ router.post('/', authorize('manager', 'admin'), route((req, res) => {
     throw error;
   }
 
+  audit(req.user.id, 'team.create', 'team', result.lastInsertRowid, { name });
+
   res.status(201).json({
     success: true,
     message: 'Team created successfully',
@@ -131,6 +133,10 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
   } catch (error) {
     if (isUniqueViolation(error)) throw conflict('Team with this name already exists');
     throw error;
+  }
+
+  if (team.name !== name) {
+    audit(req.user.id, 'team.update', 'team', team.id, { name: { from: team.name, to: name } });
   }
 
   res.json({
@@ -162,6 +168,9 @@ router.delete('/:id', authorize('manager', 'admin'), route((req, res) => {
 
   db.prepare('DELETE FROM teams WHERE id = ?').run(team.id);
 
+  // Recorded after the fact: the audit entry is the only remaining trace.
+  audit(req.user.id, 'team.delete', 'team', team.id, { name: team.name });
+
   res.json({
     success: true,
     message: 'Team deleted successfully'
@@ -192,6 +201,13 @@ router.post('/:id/members', authorize('manager', 'admin'), route((req, res) => {
     throw error;
   }
 
+  // Team membership decides who a request can be assigned to, so joining a team
+  // is an access change and belongs in the trail.
+  audit(req.user.id, 'team.member.add', 'team', team.id, {
+    user_id: Number(userId),
+    role: user.role
+  });
+
   res.status(201).json({
     success: true,
     message: 'Member added to team successfully'
@@ -212,6 +228,8 @@ router.delete('/:id/members/:userId', authorize('manager', 'admin'), route((req,
   }
 
   db.prepare('DELETE FROM team_members WHERE team_id = ? AND user_id = ?').run(teamId, userId);
+
+  audit(req.user.id, 'team.member.remove', 'team', teamId, { user_id: userId });
 
   res.json({
     success: true,
