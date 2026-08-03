@@ -591,6 +591,218 @@ html.gg-theme-transitioning .manager-theme-toggle {
   .signup-grid { grid-template-columns: 1fr; }
 }
 
+/* Requests is one of the oldest screens in the product and its original
+   palette still sits in styles.css. Keep this final compatibility layer after
+   those legacy declarations so both modes use the current design system. */
+.technician-shell .technician-requests-page .request-top-bar {
+  border-color: var(--gg-color-border-strong);
+  background: var(--gg-color-surface);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--gg-color-text) 6%, transparent);
+}
+
+.technician-shell .technician-requests-page .status-phase-label {
+  color: var(--gg-color-text-muted);
+  font-size: .75rem;
+}
+
+.technician-shell .technician-requests-page .status-phase.active .status-phase-label {
+  color: var(--gg-color-primary-text);
+}
+
+.technician-shell .technician-requests-page .status-phase.completed .status-phase-label {
+  color: var(--gg-color-text-secondary);
+}
+
+.technician-shell .technician-requests-page .table-wrap {
+  border-color: var(--gg-color-border-strong);
+  background: var(--gg-color-surface);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--gg-color-text) 6%, transparent);
+}
+
+.technician-shell .technician-requests-page .requests-table tbody tr.is-selected > td {
+  background: var(--gg-color-primary-soft);
+}
+
+.technician-shell .technician-requests-page .requests-table tbody tr.is-selected > td:first-child {
+  box-shadow: inset 4px 0 var(--gg-color-primary);
+}
+
+.technician-shell .technician-requests-page .request-table-status,
+.technician-shell .technician-requests-page .request-table-type {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  padding: 4px 10px;
+  border: 1px solid var(--gg-color-border-accent);
+  border-radius: 999px;
+  background: var(--gg-color-primary-soft-strong);
+  color: var(--gg-color-primary-text);
+  font-size: .72rem;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: capitalize;
+}
+
+.technician-shell .technician-requests-page .request-table-type {
+  border-color: var(--gg-color-border);
+  background: var(--gg-color-surface-subtle);
+  color: var(--gg-color-text-secondary);
+}
+
+.technician-shell .technician-requests-page .request-table-status--in_progress {
+  border-color: color-mix(in srgb, var(--gg-color-info) 50%, var(--gg-color-border));
+  background: var(--gg-color-info-soft);
+  color: var(--gg-color-info);
+}
+
+.technician-shell .technician-requests-page .request-table-status--repaired {
+  border-color: color-mix(in srgb, var(--gg-color-success) 50%, var(--gg-color-border));
+  background: var(--gg-color-success-soft);
+  color: var(--gg-color-success);
+}
+
+.technician-shell .technician-requests-page .request-table-status--scrap {
+  border-color: color-mix(in srgb, var(--gg-color-danger) 50%, var(--gg-color-border));
+  background: var(--gg-color-danger-soft);
+  color: var(--gg-color-danger);
+}
+
+.technician-shell .technician-requests-page .request-form-panel,
+.technician-shell .technician-requests-page .request-details-panel {
+  border-color: var(--gg-color-border-strong);
+  background: var(--gg-color-surface);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--gg-color-text) 6%, transparent);
+}
+
+.technician-shell .technician-requests-page .form-input:disabled {
+  border-color: var(--gg-color-border);
+  background: var(--gg-color-surface-subtle);
+  color: var(--gg-color-text-secondary);
+  -webkit-text-fill-color: var(--gg-color-text-secondary);
+}
+
+:root[data-theme='light'] .technician-shell .technician-requests-page .request-top-bar,
+:root[data-theme='light'] .technician-shell .technician-requests-page .table-wrap,
+:root[data-theme='light'] .technician-shell .technician-requests-page .request-form-panel,
+:root[data-theme='light'] .technician-shell .technician-requests-page .request-details-panel {
+  background: #fbfcfc;
+}
+
+:root[data-theme='light'] .technician-shell .technician-requests-page .form-input:disabled {
+  background: #edf3f5;
+}
+
+/* Dedicated request detail cards. These class names intentionally do not
+   exist in the legacy stylesheet, which prevents its translucent navy panels
+   from leaking into light mode. */
+.technician-shell .technician-requests-page .request-overview-card {
+  position: relative;
+  overflow: hidden;
+  padding: var(--gg-space-5) !important;
+  border: 1px solid var(--gg-color-border-strong) !important;
+  border-radius: calc(var(--gg-radius-lg) + 2px) !important;
+  background: var(--gg-color-surface) !important;
+  color: var(--gg-color-text) !important;
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--gg-color-text) 7%, transparent) !important;
+}
+
+.technician-shell .technician-requests-page .request-overview-card::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--gg-color-primary), transparent 82%);
+  content: '';
+}
+
+.technician-shell .technician-requests-page .request-overview-card--secondary::before {
+  background: linear-gradient(90deg, var(--gg-color-info), transparent 82%);
+}
+
+.technician-shell .technician-requests-page .request-overview-card .request-title {
+  padding-bottom: var(--gg-space-4);
+  border-bottom: 1px solid var(--gg-color-border);
+  color: var(--gg-color-text) !important;
+}
+
+.technician-shell .technician-requests-page .request-overview-card .form-section {
+  padding: var(--gg-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--gg-radius-md);
+  background: var(--gg-color-surface-subtle);
+}
+
+.technician-shell .technician-requests-page .request-overview-card .form-section:focus-within {
+  border-color: var(--gg-color-border-accent);
+}
+
+.technician-shell .technician-requests-page .request-overview-card .form-section label {
+  color: var(--gg-color-text-secondary) !important;
+  font-size: .72rem;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
+
+.technician-shell .technician-requests-page .request-overview-card .form-input:disabled {
+  min-height: 42px;
+  border-color: var(--gg-color-border) !important;
+  background: var(--gg-color-surface-raised) !important;
+  color: var(--gg-color-text-secondary) !important;
+  -webkit-text-fill-color: var(--gg-color-text-secondary) !important;
+  opacity: 1;
+}
+
+.technician-shell .technician-requests-page .request-notes-card {
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid var(--gg-color-border-strong) !important;
+  border-radius: calc(var(--gg-radius-lg) + 2px) !important;
+  background: var(--gg-color-surface) !important;
+  color: var(--gg-color-text) !important;
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--gg-color-text) 7%, transparent);
+}
+
+.technician-shell .technician-requests-page .request-notes-card .tabs-header {
+  border-bottom: 1px solid var(--gg-color-border) !important;
+  background: var(--gg-color-surface-subtle) !important;
+}
+
+.technician-shell .technician-requests-page .request-notes-card .tab-btn {
+  color: var(--gg-color-text-muted) !important;
+}
+
+.technician-shell .technician-requests-page .request-notes-card .tab-btn.active {
+  border-bottom-color: var(--gg-color-primary) !important;
+  background: var(--gg-color-primary-soft);
+  color: var(--gg-color-primary-text) !important;
+}
+
+.technician-shell .technician-requests-page .request-notes-card .tab-content {
+  background: var(--gg-color-surface) !important;
+}
+
+.technician-shell .technician-requests-page .request-notes-card .notes-textarea {
+  border-color: var(--gg-color-border) !important;
+  background: var(--gg-color-surface-raised) !important;
+  color: var(--gg-color-text) !important;
+}
+
+:root[data-theme='light'] .technician-shell .technician-requests-page .request-overview-card,
+:root[data-theme='light'] .technician-shell .technician-requests-page .request-notes-card,
+:root[data-theme='light'] .technician-shell .technician-requests-page .request-notes-card .tab-content {
+  background: #fbfcfc !important;
+}
+
+:root[data-theme='light'] .technician-shell .technician-requests-page .request-overview-card .form-section {
+  background: #f2f6f7;
+}
+
+:root[data-theme='light'] .technician-shell .technician-requests-page .request-overview-card .form-input:disabled,
+:root[data-theme='light'] .technician-shell .technician-requests-page .request-notes-card .notes-textarea {
+  background: #ffffff !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root[data-theme='light'] .landing-highlight-card:hover,
   :root[data-theme='light'] .landing-feature-card:hover,

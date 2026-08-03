@@ -132,6 +132,7 @@ export default function App() {
         ) : (
           <div className="brand" style={{ marginTop: 4 }}>GearGuard</div>
         )}
+        <nav className={usesOperationsShell ? 'manager-sidebar__navigation' : undefined} aria-label={`${workspaceLabel} sections`}>
         {isUser ? (
           <>
             <p className="manager-sidebar__group-label">My workspace</p>
@@ -202,10 +203,11 @@ export default function App() {
             <NavLink to="/app/teams">Teams</NavLink>
           </>
         )}
+        </nav>
 
         {usesOperationsShell ? (
           <div className="manager-sidebar__footer">
-            <div className="manager-sidebar__user"><strong>{user?.name || workspaceLabel}</strong><span>{user?.email || `${workspaceLabel} account`}</span>{isAdmin && <em>System administrator</em>}</div>
+            <div className="manager-sidebar__user"><span className="manager-sidebar__avatar" aria-hidden="true">{String(user?.name || workspaceLabel).trim().charAt(0).toUpperCase()}</span><span className="manager-sidebar__identity"><strong>{user?.name || workspaceLabel}</strong><span>{user?.email || `${workspaceLabel} account`}</span></span></div>
             <button type="button" className="manager-theme-toggle" aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} aria-pressed={theme === 'dark'} onClick={toggleTheme}><span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span><span className="manager-theme-toggle__label manager-theme-toggle__label--short">{theme === 'dark' ? 'Light' : 'Dark'}</span><span className="manager-theme-toggle__label manager-theme-toggle__label--long">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span></button>
             <button type="button" className="sidebar-logout" onClick={handleLogout}>Log out</button>
           </div>

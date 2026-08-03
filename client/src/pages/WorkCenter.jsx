@@ -190,7 +190,7 @@ export default function WorkCenter() {
                             <th className="manager-number-cell">Capacity</th>
                             <th className="manager-number-cell">Time efficiency</th>
                             <th className="manager-number-cell">OEE target</th>
-                            {canManage && <th>Actions</th>}
+                            {canManage && <th className="manager-workcenter-actions-heading">Actions</th>}
                         </tr>
                     </thead>
                     <tbody>
@@ -208,7 +208,7 @@ export default function WorkCenter() {
                                 <td data-label="Capacity" className="manager-number-cell">{Number(wc.capacity_per_hour ?? 0).toFixed(2)}</td>
                                 <td data-label="Time efficiency" className="manager-number-cell">{Number(wc.time_efficiency_pct ?? 100).toFixed(2)}%</td>
                                 <td data-label="OEE target" className="manager-number-cell">{Number(wc.oee_target_pct ?? 0).toFixed(2)}%</td>
-                                {canManage && <td data-label="Actions"><div className="manager-inline-actions"><Button variant="tertiary" size="small" onClick={() => openEdit(wc)}>Edit</Button><Button variant="danger" size="small" onClick={() => deactivate(wc)}>Deactivate</Button></div></td>}
+                                {canManage && <td className="manager-workcenter-action-cell" data-label="Actions"><div className="manager-inline-actions"><Button variant="tertiary" size="small" onClick={() => openEdit(wc)}>Edit</Button><Button variant="danger" size="small" onClick={() => deactivate(wc)}>Deactivate</Button></div></td>}
                             </tr>
                         ))}
                     </tbody>
