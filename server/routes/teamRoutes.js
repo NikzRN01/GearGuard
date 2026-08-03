@@ -19,17 +19,17 @@ const router = express.Router();
 // capability available to managers.
 router.use(authorize('user', 'technician', 'manager', 'admin'));
 
-const findTeam = (rawId) => {
+const findTeam = async (rawId) => {
   const id = toId(rawId);
   if (!id) throw notFound('Team not found');
-  const team = db.prepare('SELECT id, name FROM teams WHERE id = ?').get(id);
+  const team = await db.get('SELECT id, name FROM teams WHERE id = ?', [id]);
   if (!team) throw notFound('Team not found');
   return team;
 };
 
 // Get all users (for team member assignment)
-router.get('/users/all', authorize('manager', 'admin'), route((req, res) => {
-  const users = db.prepare(`
+router.get('/users/all', authorize('manager', 'admin'), route(async (req, res) => {
+  const users = await db.all(`
     SELECT
       id,
       name,
@@ -37,14 +37,14 @@ router.get('/users/all', authorize('manager', 'admin'), route((req, res) => {
       role
     FROM users
     ORDER BY name
-  `).all();
+  `);
 
   res.json({ success: true, data: users });
 }));
 
 // Get all teams
-router.get('/', route((req, res) => {
-  const teams = db.prepare(`
+router.get('/', route(async (req, res) => {
+  const teams = await db.all(`
     SELECT
       t.id,
       t.name,
@@ -54,7 +54,7 @@ router.get('/', route((req, res) => {
     LEFT JOIN team_members tm ON t.id = tm.team_id
     GROUP BY t.id
     ORDER BY t.name
-  `).all();
+  `);
 
   res.json({ success: true, data: teams });
 }));
@@ -64,11 +64,11 @@ router.get('/', route((req, res) => {
 // they are outside the maintenance organisation, so they get names and roles
 // without the address book. GET /teams/users/all is manager-only for the same
 // reason and this endpoint must not become a way around it.
-router.get('/:id', route((req, res) => {
-  const team = findTeam(req.params.id);
+router.get('/:id', route(async (req, res) => {
+  const team = await findTeam(req.params.id);
   const showContactDetails = ['technician', 'manager', 'admin'].includes(req.user.role);
 
-  const members = db.prepare(`
+  const members = await db.all(`
     SELECT
       u.id,
       u.name,
@@ -79,9 +79,9 @@ router.get('/:id', route((req, res) => {
     JOIN users u ON tm.user_id = u.id
     WHERE tm.team_id = ?
     ORDER BY u.name
-  `).all(team.id);
+  `, [team.id]);
 
-  const full = db.prepare('SELECT * FROM teams WHERE id = ?').get(team.id);
+  const full = await db.get('SELECT * FROM teams WHERE id = ?', [team.id]);
 
   res.json({
     success: true,
@@ -90,53 +90,53 @@ router.get('/:id', route((req, res) => {
 }));
 
 // Create new team
-router.post('/', authorize('manager', 'admin'), route((req, res) => {
+router.post('/', authorize('manager', 'admin'), route(async (req, res) => {
   const name = requiredString((req.body || {}).name, 'Team name', LIMITS.name);
 
   // Check for duplicate team name
-  const existing = db.prepare('SELECT id FROM teams WHERE name = ?').get(name);
+  const existing = await db.get('SELECT id FROM teams WHERE name = ?', [name]);
   if (existing) {
     throw conflict('Team with this name already exists');
   }
 
-  let result;
+  let created;
   try {
-    result = db.prepare('INSERT INTO teams (name) VALUES (?)').run(name);
+    created = await db.insert('INSERT INTO teams (name) VALUES (?)', [name]);
   } catch (error) {
     // Concurrent creates both pass the check above; the UNIQUE index decides.
     if (isUniqueViolation(error)) throw conflict('Team with this name already exists');
     throw error;
   }
 
-  audit(req.user.id, 'team.create', 'team', result.lastInsertRowid, { name });
+  await audit(req.user.id, 'team.create', 'team', created.id, { name });
 
   res.status(201).json({
     success: true,
     message: 'Team created successfully',
-    data: { id: result.lastInsertRowid }
+    data: { id: created.id }
   });
 }));
 
 // Update team
-router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
-  const team = findTeam(req.params.id);
+router.put('/:id', authorize('manager', 'admin'), route(async (req, res) => {
+  const team = await findTeam(req.params.id);
   const name = requiredString((req.body || {}).name, 'Team name', LIMITS.name);
 
   // Check for duplicate team name
-  const duplicate = db.prepare('SELECT id FROM teams WHERE name = ? AND id != ?').get(name, team.id);
+  const duplicate = await db.get('SELECT id FROM teams WHERE name = ? AND id != ?', [name, team.id]);
   if (duplicate) {
     throw conflict('Team with this name already exists');
   }
 
   try {
-    db.prepare('UPDATE teams SET name = ? WHERE id = ?').run(name, team.id);
+    await db.run('UPDATE teams SET name = ? WHERE id = ?', [name, team.id]);
   } catch (error) {
     if (isUniqueViolation(error)) throw conflict('Team with this name already exists');
     throw error;
   }
 
   if (team.name !== name) {
-    audit(req.user.id, 'team.update', 'team', team.id, { name: { from: team.name, to: name } });
+    await audit(req.user.id, 'team.update', 'team', team.id, { name: { from: team.name, to: name } });
   }
 
   res.json({
@@ -146,30 +146,26 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
 }));
 
 // Delete team
-router.delete('/:id', authorize('manager', 'admin'), route((req, res) => {
-  const team = findTeam(req.params.id);
+router.delete('/:id', authorize('manager', 'admin'), route(async (req, res) => {
+  const team = await findTeam(req.params.id);
 
   // Check if team is assigned to any equipment
-  const hasEquipment = db
-    .prepare('SELECT id FROM equipment WHERE maintenance_team_id = ? LIMIT 1')
-    .get(team.id);
+  const hasEquipment = await db.get('SELECT id FROM equipment WHERE maintenance_team_id = ? LIMIT 1', [team.id]);
   if (hasEquipment) {
     throw badRequest('Cannot delete team assigned to equipment');
   }
 
   // Maintenance requests reference the team too; deleting would leave them
   // pointing at a row that no longer exists.
-  const hasRequests = db
-    .prepare('SELECT id FROM maintenance_requests WHERE team_id = ? LIMIT 1')
-    .get(team.id);
+  const hasRequests = await db.get('SELECT id FROM maintenance_requests WHERE team_id = ? LIMIT 1', [team.id]);
   if (hasRequests) {
     throw badRequest('Cannot delete team assigned to maintenance requests');
   }
 
-  db.prepare('DELETE FROM teams WHERE id = ?').run(team.id);
+  await db.run('DELETE FROM teams WHERE id = ?', [team.id]);
 
   // Recorded after the fact: the audit entry is the only remaining trace.
-  audit(req.user.id, 'team.delete', 'team', team.id, { name: team.name });
+  await audit(req.user.id, 'team.delete', 'team', team.id, { name: team.name });
 
   res.json({
     success: true,
@@ -178,24 +174,22 @@ router.delete('/:id', authorize('manager', 'admin'), route((req, res) => {
 }));
 
 // Add member to team
-router.post('/:id/members', authorize('manager', 'admin'), route((req, res) => {
-  const team = findTeam(req.params.id);
+router.post('/:id/members', authorize('manager', 'admin'), route(async (req, res) => {
+  const team = await findTeam(req.params.id);
   const userId = requiredId((req.body || {}).user_id, 'User ID');
 
   // Check if user exists
-  const user = db.prepare('SELECT id, role FROM users WHERE id = ?').get(userId);
+  const user = await db.get('SELECT id, role FROM users WHERE id = ?', [userId]);
   if (!user) throw notFound('User not found');
 
   // Check if user is already a member
-  const existing = db
-    .prepare('SELECT id FROM team_members WHERE team_id = ? AND user_id = ?')
-    .get(team.id, userId);
+  const existing = await db.get('SELECT id FROM team_members WHERE team_id = ? AND user_id = ?', [team.id, userId]);
   if (existing) {
     throw conflict('User is already a member of this team');
   }
 
   try {
-    db.prepare('INSERT INTO team_members (team_id, user_id) VALUES (?, ?)').run(team.id, userId);
+    await db.run('INSERT INTO team_members (team_id, user_id) VALUES (?, ?)', [team.id, userId]);
   } catch (error) {
     if (isUniqueViolation(error)) throw conflict('User is already a member of this team');
     throw error;
@@ -203,7 +197,7 @@ router.post('/:id/members', authorize('manager', 'admin'), route((req, res) => {
 
   // Team membership decides who a request can be assigned to, so joining a team
   // is an access change and belongs in the trail.
-  audit(req.user.id, 'team.member.add', 'team', team.id, {
+  await audit(req.user.id, 'team.member.add', 'team', team.id, {
     user_id: Number(userId),
     role: user.role
   });
@@ -215,21 +209,19 @@ router.post('/:id/members', authorize('manager', 'admin'), route((req, res) => {
 }));
 
 // Remove member from team
-router.delete('/:id/members/:userId', authorize('manager', 'admin'), route((req, res) => {
+router.delete('/:id/members/:userId', authorize('manager', 'admin'), route(async (req, res) => {
   const teamId = toId(req.params.id);
   const userId = toId(req.params.userId);
   if (!teamId || !userId) throw notFound('Member not found in this team');
 
-  const existing = db
-    .prepare('SELECT id FROM team_members WHERE team_id = ? AND user_id = ?')
-    .get(teamId, userId);
+  const existing = await db.get('SELECT id FROM team_members WHERE team_id = ? AND user_id = ?', [teamId, userId]);
   if (!existing) {
     throw notFound('Member not found in this team');
   }
 
-  db.prepare('DELETE FROM team_members WHERE team_id = ? AND user_id = ?').run(teamId, userId);
+  await db.run('DELETE FROM team_members WHERE team_id = ? AND user_id = ?', [teamId, userId]);
 
-  audit(req.user.id, 'team.member.remove', 'team', teamId, { user_id: userId });
+  await audit(req.user.id, 'team.member.remove', 'team', teamId, { user_id: userId });
 
   res.json({
     success: true,
@@ -238,10 +230,10 @@ router.delete('/:id/members/:userId', authorize('manager', 'admin'), route((req,
 }));
 
 // Get available users (eligible users who are not already in this team)
-router.get('/:id/available-users', authorize('manager', 'admin'), route((req, res) => {
-  const team = findTeam(req.params.id);
+router.get('/:id/available-users', authorize('manager', 'admin'), route(async (req, res) => {
+  const team = await findTeam(req.params.id);
 
-  const users = db.prepare(`
+  const users = await db.all(`
     SELECT
       u.id,
       u.name,
@@ -253,7 +245,7 @@ router.get('/:id/available-users', authorize('manager', 'admin'), route((req, re
     )
     AND u.role IN ('technician', 'manager')
     ORDER BY u.name
-  `).all(team.id);
+  `, [team.id]);
 
   res.json({ success: true, data: users });
 }));

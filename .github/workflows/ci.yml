@@ -19,6 +19,25 @@ jobs:
       matrix:
         # The floor declared in server/package.json engines, and current LTS.
         node: ['22.12', '22']
+
+    # The suite needs a real PostgreSQL: it runs the migrations and asserts on
+    # schema facts. Each test file isolates itself in its own schema, so one
+    # instance serves the whole run.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gearguard
+          POSTGRES_PASSWORD: gearguard
+          POSTGRES_DB: gearguard
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gearguard"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
     defaults:
       run:
         working-directory: server
@@ -35,9 +54,10 @@ jobs:
 
       - run: npm run lint
 
-      # The suite points SQLITE_DB_PATH at a throwaway file and stubs SMTP, so
-      # it needs no services and no secrets.
+      # SMTP is stubbed by the harness, so no secrets are needed.
       - run: npm test
+        env:
+          TEST_DATABASE_URL: postgresql://gearguard:gearguard@127.0.0.1:5432/gearguard
 
   client:
     name: Client (${{ matrix.node }})

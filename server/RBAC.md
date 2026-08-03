@@ -24,7 +24,7 @@ also inherit every operational capability available to managers.
 ## Session security
 
 - Opaque random session identifiers are stored only in an `HttpOnly` cookie.
-- Only SHA-256 hashes of session identifiers are stored in SQLite.
+- Only SHA-256 hashes of session identifiers are stored in the database.
 - Sessions expire after eight hours by default and are revoked on logout.
 - Unsafe API methods require the per-session `X-CSRF-Token`.
 - Password reset tokens are random, single-use, hashed at rest, and expire after one hour.

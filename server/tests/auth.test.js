@@ -53,7 +53,7 @@ test('SECURITY: public signup cannot mint a privileged account', async () => {
     });
     assert.equal(res.status, 400, `signup accepted role "${role}"`);
 
-    const exists = h.db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+    const exists = await h.db.get('SELECT id FROM users WHERE email = ?', [email]);
     assert.equal(exists, undefined, `a ${role} account was created anyway`);
   }
 });
@@ -112,10 +112,9 @@ test('signup: rejects a duplicate email with 409', async () => {
 
 test('signup: never stores the password in plain text', async () => {
   const user = await h.createUser('user');
-  const Database = require('better-sqlite3');
-  const db = new Database(h.dbFile, { readonly: true });
-  const row = db.prepare('SELECT password FROM users WHERE email = ?').get(user.email);
-  db.close();
+  // Read the column directly rather than through the API, which never returns
+  // it: the point is what actually landed in storage.
+  const row = await h.db.get('SELECT password FROM users WHERE email = ?', [user.email]);
   assert.notEqual(row.password, user.password);
   assert.match(row.password, /^\$2[aby]\$/);
 });

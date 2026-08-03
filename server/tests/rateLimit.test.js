@@ -5,38 +5,39 @@
  * deliberately tiny ceiling before the app is loaded. The other suites raise
  * the ceiling instead, which is why the limiter needs its own coverage here.
  */
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+// Must come first: it sets DATABASE_URL and this process's schema before the
+// app - and therefore the connection pool - is loaded.
+const { teardown } = require('./testEnv');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-process.env.SQLITE_DB_PATH = path.join(
-  fs.mkdtempSync(path.join(os.tmpdir(), 'gearguard-ratelimit-')),
-  'portal.db'
-);
-process.env.NODE_ENV = 'test';
-process.env.SMTP_USER = '';
-process.env.SMTP_PASS = '';
-process.env.MAIL_TRANSPORT = 'json';
+// Deliberately tiny ceilings, set before the app reads them.
 process.env.AUTH_LOGIN_RATE_MAX = '3';
 process.env.AUTH_RECOVERY_RATE_MAX = '2';
 process.env.AUTH_SIGNUP_RATE_MAX = '3';
 
 const app = require('../server');
+const db = require('../database');
 const rateLimit = require('../middleware/rateLimit');
 
 let server;
 let baseUrl;
 
-test.before(() => new Promise((resolve) => {
-  server = app.listen(0, '127.0.0.1', () => {
-    baseUrl = `http://127.0.0.1:${server.address().port}`;
-    resolve();
+test.before(async () => {
+  // Migrations are asynchronous now, so the app is not ready at import.
+  await app.ready;
+  await new Promise((resolve) => {
+    server = app.listen(0, '127.0.0.1', () => {
+      baseUrl = `http://127.0.0.1:${server.address().port}`;
+      resolve();
+    });
   });
-}));
+});
 
-test.after(() => new Promise((resolve) => server.close(resolve)));
+test.after(async () => {
+  await new Promise((resolve) => server.close(resolve));
+  await teardown(db);
+});
 
 const post = async (routePath, body) => {
   const response = await fetch(`${baseUrl}${routePath}`, {

@@ -1,32 +1,25 @@
 /**
  * Role-based access control, exercised against the seeded demo accounts.
  *
- * The environment below MUST be set before `../server` is required: that import
- * pulls in dotenv and database.js, and without an explicit SQLITE_DB_PATH this
- * suite opened the developer's own server/portal.db and wrote sessions, audit
- * entries and signup accounts into it on every run. A fresh file gets the same
- * demo seed (seedDemoData in database.js), so the accounts below still exist.
+ * testEnv MUST be required before `../server`: that import builds the
+ * connection pool, and without the environment in place this suite would run
+ * against whatever DATABASE_URL points at - in a developer's shell, their own
+ * working database, which it would fill with sessions, audit rows and signup
+ * accounts on every run. A fresh schema gets the same demo seed (seedDemoData
+ * in database.js), so the accounts below still exist.
  */
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+// Must come first: it sets DATABASE_URL and this process's schema before the
+// app - and therefore the connection pool - is loaded.
+const { teardown } = require('./testEnv');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-process.env.SQLITE_DB_PATH = path.join(
-  fs.mkdtempSync(path.join(os.tmpdir(), 'gearguard-rbac-')),
-  'portal.db'
-);
-process.env.NODE_ENV = 'test';
-// Blank the credentials from .env as well, so no run can reach a real mailbox.
-process.env.SMTP_USER = '';
-process.env.SMTP_PASS = '';
-process.env.MAIL_TRANSPORT = 'json';
 process.env.AUTH_LOGIN_RATE_MAX = '100000';
 process.env.AUTH_SIGNUP_RATE_MAX = '100000';
 process.env.AUTH_RECOVERY_RATE_MAX = '100000';
 
 const app = require('../server');
+const db = require('../database');
 
 /** The password seedDemoData gives every demo account. */
 const DEMO_PASSWORD = 'Password123!';
@@ -34,14 +27,22 @@ const DEMO_PASSWORD = 'Password123!';
 let server;
 let baseUrl;
 
-test.before(() => new Promise((resolve) => {
-  server = app.listen(0, '127.0.0.1', () => {
-    baseUrl = `http://127.0.0.1:${server.address().port}/api`;
-    resolve();
+test.before(async () => {
+  // The demo accounts this suite signs in as are created by seedDemoData during
+  // initialization, which is asynchronous now.
+  await app.ready;
+  await new Promise((resolve) => {
+    server = app.listen(0, '127.0.0.1', () => {
+      baseUrl = `http://127.0.0.1:${server.address().port}/api`;
+      resolve();
+    });
   });
-}));
+});
 
-test.after(() => new Promise((resolve) => server.close(resolve)));
+test.after(async () => {
+  await new Promise((resolve) => server.close(resolve));
+  await teardown(db);
+});
 
 async function login(email, role) {
   const response = await fetch(`${baseUrl}/auth/login`, {

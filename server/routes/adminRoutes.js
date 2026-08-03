@@ -5,13 +5,13 @@ const { authorize, audit } = require('../middleware/auth');
 const router = express.Router();
 router.use(authorize('admin'));
 
-router.get('/overview', (req, res) => {
+router.get('/overview', async (req, res) => {
   try {
-    const roleRows = db.prepare('SELECT role, COUNT(*) AS count FROM users GROUP BY role').all();
+    const roleRows = await db.all('SELECT role, COUNT(*) AS count FROM users GROUP BY role');
     const roles = Object.fromEntries(roleRows.map((row) => [row.role, row.count]));
-    const activeSessions = db.prepare('SELECT COUNT(*) AS count FROM sessions WHERE expires_at > CURRENT_TIMESTAMP').get().count;
-    const recentAuditEvents = db.prepare("SELECT COUNT(*) AS count FROM audit_log WHERE created_at >= datetime('now', '-24 hours')").get().count;
-    const pendingPasswordResets = db.prepare('SELECT COUNT(*) AS count FROM password_reset_tokens WHERE used_at IS NULL AND expires_at > CURRENT_TIMESTAMP').get().count;
+    const activeSessions = (await db.get('SELECT COUNT(*) AS count FROM sessions WHERE expires_at > now()')).count;
+    const recentAuditEvents = (await db.get("SELECT COUNT(*) AS count FROM audit_log WHERE created_at >= now() - interval '24 hours'")).count;
+    const pendingPasswordResets = (await db.get('SELECT COUNT(*) AS count FROM password_reset_tokens WHERE used_at IS NULL AND expires_at > now()')).count;
 
     res.json({
       success: true,
@@ -29,9 +29,9 @@ router.get('/overview', (req, res) => {
   }
 });
 
-router.get('/users', (req, res) => {
+router.get('/users', async (req, res) => {
   try {
-    const users = db.prepare('SELECT id, name, email, role, created_at FROM users ORDER BY name').all();
+    const users = await db.all('SELECT id, name, email, role, created_at FROM users ORDER BY name');
     res.json({ success: true, data: users });
   } catch (error) {
     console.error('Admin users error:', error);
@@ -39,7 +39,7 @@ router.get('/users', (req, res) => {
   }
 });
 
-router.patch('/users/:id/role', (req, res) => {
+router.patch('/users/:id/role', async (req, res) => {
   const userId = Number(req.params.id);
   const role = String(req.body?.role || '').trim().toLowerCase();
   const assignableRoles = ['user', 'technician', 'manager'];
@@ -47,15 +47,15 @@ router.patch('/users/:id/role', (req, res) => {
   if (!Number.isInteger(userId) || userId <= 0) return res.status(400).json({ success: false, message: 'A valid user is required' });
   if (!assignableRoles.includes(role)) return res.status(400).json({ success: false, message: 'Only user, technician, or manager access can be assigned here' });
 
-  const target = db.prepare('SELECT id, name, email, role FROM users WHERE id = ?').get(userId);
+  const target = await db.get('SELECT id, name, email, role FROM users WHERE id = ?', [userId]);
   if (!target) return res.status(404).json({ success: false, message: 'User not found' });
   if (target.id === req.user.id || target.role === 'admin') {
     return res.status(403).json({ success: false, message: 'Administrator access is protected and cannot be changed here' });
   }
 
-  db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, userId);
-  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
-  audit(req.user.id, 'admin.user.role.update', 'user', userId, { from: target.role, to: role });
+  await db.run('UPDATE users SET role = ? WHERE id = ?', [role, userId]);
+  await db.run('DELETE FROM sessions WHERE user_id = ?', [userId]);
+  await audit(req.user.id, 'admin.user.role.update', 'user', userId, { from: target.role, to: role });
   res.json({ success: true, data: { ...target, role }, message: 'Access role updated. Existing sessions were revoked.' });
 });
 
@@ -73,7 +73,7 @@ const AUDIT_MAX_PAGE_SIZE = 200;
  * `metadata_json` is returned parsed, because that is where the before/after
  * values live and a caller should not have to re-parse it.
  */
-router.get('/audit', (req, res) => {
+router.get('/audit', async (req, res) => {
   try {
     const requestedLimit = Number.parseInt(req.query.limit, 10);
     const limit = Number.isInteger(requestedLimit) && requestedLimit > 0
@@ -99,9 +99,9 @@ router.get('/audit', (req, res) => {
     }
     const where = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
 
-    const total = db.prepare(`SELECT COUNT(*) AS count FROM audit_log a ${where}`).get(...params).count;
+    const total = (await db.get(`SELECT COUNT(*) AS count FROM audit_log a ${where}`, params)).count;
 
-    const events = db.prepare(`
+    const rows = await db.all(`
       SELECT a.id, a.action, a.resource_type, a.resource_id, a.metadata_json, a.created_at,
              u.name AS actor_name, u.email AS actor_email
       FROM audit_log a
@@ -109,7 +109,9 @@ router.get('/audit', (req, res) => {
       ${where}
       ORDER BY a.created_at DESC, a.id DESC
       LIMIT ? OFFSET ?
-    `).all(...params, limit, offset).map(({ metadata_json, ...event }) => {
+    `, [...params, limit, offset]);
+
+    const events = rows.map(({ metadata_json, ...event }) => {
       // A row written before metadata existed, or one holding unparseable JSON,
       // must not take down the whole page - the rest of the trail is still
       // evidence, and the raw text is preserved so nothing is lost.

@@ -34,13 +34,14 @@ const cookieOptions = () => [
   process.env.NODE_ENV === 'production' ? 'Secure' : null
 ].filter(Boolean);
 
-function createSession(userId) {
+async function createSession(userId) {
   const token = crypto.randomBytes(32).toString('base64url');
   const csrfToken = crypto.randomBytes(24).toString('base64url');
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
-  db.prepare('DELETE FROM sessions WHERE expires_at <= CURRENT_TIMESTAMP').run();
-  db.prepare('INSERT INTO sessions (token_hash, csrf_token, user_id, expires_at) VALUES (?, ?, ?, ?)')
-    .run(hashToken(token), csrfToken, userId, expiresAt);
+  await db.run('DELETE FROM sessions WHERE expires_at <= now()');
+  await db.run('INSERT INTO sessions (token_hash, csrf_token, user_id, expires_at) VALUES (?, ?, ?, ?)', [
+    hashToken(token), csrfToken, userId, expiresAt
+  ]);
   return { token, csrfToken, expiresAt };
 }
 
@@ -52,35 +53,41 @@ function clearSessionCookie(res) {
   res.setHeader('Set-Cookie', [`${SESSION_COOKIE}=`, ...cookieOptions(), 'Max-Age=0'].join('; '));
 }
 
-function getSession(req) {
+async function getSession(req) {
   const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
   if (!token) return null;
-  return db.prepare(`
+  // `u.id` is selected last so it wins the name collision with `s.id`, which is
+  // aliased away - the caller expects `id` to mean the user.
+  return await db.get(`
     SELECT s.id AS session_id, s.csrf_token, s.expires_at,
            u.id, u.name, u.email, u.role, u.avatar_url, u.created_at
     FROM sessions s
     JOIN users u ON u.id = s.user_id
-    WHERE s.token_hash = ? AND s.expires_at > CURRENT_TIMESTAMP
-  `).get(hashToken(token)) || null;
+    WHERE s.token_hash = ? AND s.expires_at > now()
+  `, [hashToken(token)]) || null;
 }
 
-function authenticate(req, res, next) {
-  const session = getSession(req);
-  if (!session) {
-    clearSessionCookie(res);
-    return res.status(401).json({ success: false, message: 'Authentication required' });
+async function authenticate(req, res, next) {
+  try {
+    const session = await getSession(req);
+    if (!session) {
+      clearSessionCookie(res);
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+    req.user = {
+      id: session.id,
+      name: session.name,
+      email: session.email,
+      role: session.role,
+      avatar_url: session.avatar_url,
+      created_at: session.created_at
+    };
+    req.authSession = { id: session.session_id, csrfToken: session.csrf_token, expiresAt: session.expires_at };
+    await db.run('UPDATE sessions SET last_seen_at = now() WHERE id = ?', [session.session_id]);
+    next();
+  } catch (error) {
+    next(error);
   }
-  req.user = {
-    id: session.id,
-    name: session.name,
-    email: session.email,
-    role: session.role,
-    avatar_url: session.avatar_url,
-    created_at: session.created_at
-  };
-  req.authSession = { id: session.session_id, csrfToken: session.csrf_token, expiresAt: session.expires_at };
-  db.prepare('UPDATE sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE id = ?').run(session.session_id);
-  next();
 }
 
 function requireCsrf(req, res, next) {
@@ -106,13 +113,34 @@ const authorize = (...roles) => (req, res, next) => {
   next();
 };
 
-function destroySession(req) {
-  if (req.authSession?.id) db.prepare('DELETE FROM sessions WHERE id = ?').run(req.authSession.id);
+async function destroySession(req) {
+  if (req.authSession?.id) await db.run('DELETE FROM sessions WHERE id = ?', [req.authSession.id]);
 }
 
-function audit(actorUserId, action, resourceType, resourceId = null, metadata = null) {
-  db.prepare('INSERT INTO audit_log (actor_user_id, action, resource_type, resource_id, metadata_json) VALUES (?, ?, ?, ?, ?)')
-    .run(actorUserId || null, action, resourceType, resourceId == null ? null : String(resourceId), metadata ? JSON.stringify(metadata) : null);
+/**
+ * Writes an audit entry.
+ *
+ * Callers await this before responding, so a successful response means the
+ * trail was written. A failure here is logged rather than thrown: losing the
+ * record of an action is bad, but failing the action itself after it has
+ * already been committed would be worse, and would leave the caller believing
+ * nothing happened.
+ */
+async function audit(actorUserId, action, resourceType, resourceId = null, metadata = null) {
+  try {
+    await db.run(
+      'INSERT INTO audit_log (actor_user_id, action, resource_type, resource_id, metadata_json) VALUES (?, ?, ?, ?, ?)',
+      [
+        actorUserId || null,
+        action,
+        resourceType,
+        resourceId == null ? null : String(resourceId),
+        metadata ? JSON.stringify(metadata) : null
+      ]
+    );
+  } catch (error) {
+    console.error(`Failed to write audit entry ${action}:`, error.message);
+  }
 }
 
 module.exports = {

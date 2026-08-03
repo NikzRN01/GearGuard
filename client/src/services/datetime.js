@@ -1,15 +1,22 @@
 /**
  * Dates as the API actually sends them.
  *
- * SQLite's CURRENT_TIMESTAMP produces "YYYY-MM-DD HH:MM:SS" in **UTC**, with no
- * offset marker. That string is not valid ISO 8601, so `new Date(value)` falls
- * back to the engine's own parsing and reads it as *local* time - silently
- * shifting every timestamp in the UI by the viewer's offset (5h30m in IST, and
- * enough to show the wrong calendar day either side of midnight).
+ * Timestamps now arrive as proper ISO 8601 with a `Z` offset, because the
+ * PostgreSQL columns are `timestamptz`. The zone-less form is still handled:
+ * SQLite's CURRENT_TIMESTAMP produced "YYYY-MM-DD HH:MM:SS" in **UTC** with no
+ * offset marker, which is not valid ISO 8601, so `new Date(value)` fell back to
+ * the engine's own parsing and read it as *local* time - silently shifting
+ * every timestamp in the UI by the viewer's offset (5h30m in IST, and enough to
+ * show the wrong calendar day either side of midnight). Any record written
+ * before the migration, or any future source that sends the naive form, is
+ * still read correctly.
  *
  * Date-only columns have the opposite problem: `new Date('2026-03-04')` is
  * parsed as UTC midnight by spec, which renders as the 3rd anywhere west of
- * Greenwich. Those must be built from their parts in local time instead.
+ * Greenwich. Those must be built from their parts in local time instead. The
+ * server deliberately returns `date` columns as plain "YYYY-MM-DD" strings
+ * rather than letting the driver turn them into Date objects, which would
+ * reintroduce exactly this shift (see server/db/pool.js).
  */
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;

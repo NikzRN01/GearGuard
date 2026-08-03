@@ -2,34 +2,26 @@
  * Shared test harness.
  *
  * Must be required FIRST in every test file: it points the app at a throwaway
- * SQLite file and neutralises SMTP before `server.js` (and therefore dotenv and
- * database.js) is ever loaded.
+ * PostgreSQL schema and neutralises SMTP before `server.js` (and therefore
+ * dotenv and database.js) is ever loaded.
  *
- * Every API route except /api/auth now needs a session cookie, and unsafe
- * methods also need the matching CSRF token. The module-level get/post/...-
- * helpers run as a manager, which is the role most operational tests need;
- * use `as(role)` to act as somebody else, or `anon` for no session at all.
+ * Isolation model: `node --test` runs each test file in its own process, and
+ * they run concurrently against one database server. Each process therefore
+ * gets a uniquely named schema and a search_path pointing at it, so migrations
+ * and fixtures in one file cannot be seen by another. The schema is dropped on
+ * exit. This replaces the per-file temporary SQLite file the suite used before.
+ *
+ * Every API route except /api/auth needs a session cookie, and unsafe methods
+ * also need the matching CSRF token. The module-level get/post/... helpers run
+ * as a manager, which is the role most operational tests need; use `as(role)`
+ * to act as somebody else, or `anon` for no session at all.
  */
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+// Must come first: it sets DATABASE_URL and this process's schema before the
+// app - and therefore the connection pool - is loaded.
+const { testSchema, teardown } = require('./testEnv');
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 
-const dbFile = path.join(
-  fs.mkdtempSync(path.join(os.tmpdir(), 'gearguard-test-')),
-  'portal.db'
-);
-
-// Set before requiring the app. dotenv never overrides variables that already
-// exist, so this also guarantees the developer's real Gmail creds in server/.env
-// are not picked up and no live mail is sent from a test run.
-process.env.SQLITE_DB_PATH = dbFile;
-process.env.NODE_ENV = 'test';
-process.env.SMTP_USER = '';
-process.env.SMTP_PASS = '';
-process.env.MAIL_TRANSPORT = 'json';
-process.env.CLIENT_URL = 'http://localhost:5173';
 // These suites log in and request resets far more often than a human would.
 // The limiter itself is covered by tests/rateLimit.test.js.
 process.env.AUTH_LOGIN_RATE_MAX = '100000';
@@ -44,6 +36,10 @@ let baseUrl;
 
 async function start() {
   if (server) return baseUrl;
+  // Migrations and seeding are asynchronous now, so nothing may touch the
+  // database until this settles. Helpers that query `db` directly at test time
+  // go through here as well.
+  await app.ready;
   await new Promise((resolve) => {
     server = app.listen(0, '127.0.0.1', resolve);
   });
@@ -51,11 +47,22 @@ async function start() {
   return baseUrl;
 }
 
+/**
+ * Shuts the test server down and removes this process's schema.
+ *
+ * The pool has to be closed too, or node keeps the open sockets alive and the
+ * test runner never exits.
+ */
 async function stop() {
-  if (!server) return;
-  await new Promise((resolve) => server.close(resolve));
-  server = null;
+  if (server) {
+    await new Promise((resolve) => server.close(resolve));
+    server = null;
+  }
+  await teardown(db);
 }
+
+/** Ensures migrations are done before a test queries `db` without HTTP. */
+const ready = () => app.ready;
 
 /** Low-level request. `session` supplies the cookie and CSRF token, if any. */
 async function rawRequest(method, routePath, options = {}, session = null) {
@@ -139,11 +146,13 @@ async function createUser(role = 'user', password = STRONG_PASSWORD) {
     return { id: signup.body.userId, email, password, role, name };
   }
 
+  await start();
   const hash = bcrypt.hashSync(password, 10);
-  const result = db
-    .prepare('INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)')
-    .run(name, email, hash, role);
-  return { id: Number(result.lastInsertRowid), email, password, role, name };
+  const created = await db.insert(
+    'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
+    [name, email, hash, role]
+  );
+  return { id: Number(created.id), email, password, role, name };
 }
 
 /** Creates an account of `role` and returns an agent already signed in as it. */
@@ -217,7 +226,8 @@ async function createRequest(overrides = {}) {
 module.exports = {
   app,
   db,
-  dbFile,
+  testSchema,
+  ready,
   start,
   stop,
   login,

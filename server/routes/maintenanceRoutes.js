@@ -55,22 +55,22 @@ const canAccess = (req, request) =>
   || (req.user.role === 'technician' && Number(request.assigned_to_user_id) === Number(req.user.id))
   || (req.user.role === 'user' && Number(request.created_by_user_id) === Number(req.user.id));
 
-const findRequest = (rawId, columns = 'id, status, team_id, type, equipment_id, work_center_id, scheduled_date, assigned_to_user_id, created_by_user_id') => {
+const findRequest = async (rawId, columns = 'id, status, team_id, type, equipment_id, work_center_id, scheduled_date, assigned_to_user_id, created_by_user_id') => {
   const id = toId(rawId);
   if (!id) throw notFound('Maintenance request not found');
-  const request = db.prepare(`SELECT ${columns} FROM maintenance_requests WHERE id = ?`).get(id);
+  const request = await db.get(`SELECT ${columns} FROM maintenance_requests WHERE id = ?`, [id]);
   if (!request) throw notFound('Maintenance request not found');
   return request;
 };
 
-const assertTeamExists = (teamId) => {
+const assertTeamExists = async (teamId) => {
   if (!teamId) return;
-  const team = db.prepare('SELECT id FROM teams WHERE id = ?').get(teamId);
+  const team = await db.get('SELECT id FROM teams WHERE id = ?', [teamId]);
   if (!team) throw notFound('Maintenance team not found');
 };
 
 // Get all maintenance requests
-router.get('/', route((req, res) => {
+router.get('/', route(async (req, res) => {
   const { status, type, team_id, assigned_to, scheduled_date, equipment_id, work_center_id } = req.query;
 
   let query = `
@@ -115,7 +115,7 @@ router.get('/', route((req, res) => {
   }
 
   if (scheduled_date) {
-    query += ' AND DATE(mr.scheduled_date) = DATE(?)';
+    query += ' AND mr.scheduled_date = ?::date';
     params.push(String(scheduled_date));
   }
 
@@ -136,13 +136,13 @@ router.get('/', route((req, res) => {
 
   query += ' ORDER BY mr.created_at DESC, mr.id DESC';
 
-  const requests = db.prepare(query).all(...params);
+  const requests = await db.all(query, params);
 
   res.json({ success: true, data: requests });
 }));
 
 // Get requests for calendar view (anything with a scheduled date)
-router.get('/calendar', route((req, res) => {
+router.get('/calendar', route(async (req, res) => {
   const { start_date, end_date } = req.query;
 
   let query = `
@@ -162,12 +162,12 @@ router.get('/calendar', route((req, res) => {
   const params = [];
 
   if (start_date) {
-    query += ' AND DATE(mr.scheduled_date) >= DATE(?)';
+    query += ' AND mr.scheduled_date >= ?::date';
     params.push(String(start_date));
   }
 
   if (end_date) {
-    query += ' AND DATE(mr.scheduled_date) <= DATE(?)';
+    query += ' AND mr.scheduled_date <= ?::date';
     params.push(String(end_date));
   }
 
@@ -178,17 +178,17 @@ router.get('/calendar', route((req, res) => {
 
   query += ' ORDER BY mr.scheduled_date ASC, mr.id ASC';
 
-  const requests = db.prepare(query).all(...params);
+  const requests = await db.all(query, params);
 
   res.json({ success: true, data: requests });
 }));
 
 // Get single maintenance request by ID
-router.get('/:id', route((req, res) => {
+router.get('/:id', route(async (req, res) => {
   const id = toId(req.params.id);
   if (!id) throw notFound('Maintenance request not found');
 
-  const request = db.prepare(`
+  const request = await db.get(`
     SELECT
       mr.*,
       e.name as equipment_name,
@@ -208,20 +208,20 @@ router.get('/:id', route((req, res) => {
     LEFT JOIN users u ON mr.assigned_to_user_id = u.id
     JOIN users c ON mr.created_by_user_id = c.id
     WHERE mr.id = ?
-  `).get(id);
+  `, [id]);
 
   if (!request) throw notFound('Maintenance request not found');
   if (!canAccess(req, request)) throw forbidden('You do not have access to this request');
 
   // Get notes for this request. Notes written before authorship was recorded
   // report a null author rather than being attributed to anyone.
-  const notes = db.prepare(`
+  const notes = await db.all(`
     SELECT n.*, u.name AS created_by_name
     FROM notes n
     LEFT JOIN users u ON u.id = n.created_by_user_id
     WHERE n.request_id = ?
     ORDER BY n.created_at DESC, n.id DESC
-  `).all(id);
+  `, [id]);
 
   res.json({
     success: true,
@@ -231,7 +231,7 @@ router.get('/:id', route((req, res) => {
 
 // Create new maintenance request
 // Flow: Auto-fill team_id from equipment when equipment is selected
-router.post('/', route((req, res) => {
+router.post('/', route(async (req, res) => {
   const body = req.body || {};
 
   const equipmentId = optionalId(body.equipment_id, 'Equipment') || null;
@@ -264,9 +264,7 @@ router.post('/', route((req, res) => {
   let workCenterName = null;
 
   if (equipmentId) {
-    const equipment = db
-      .prepare('SELECT id, maintenance_team_id, name FROM equipment WHERE id = ?')
-      .get(equipmentId);
+    const equipment = await db.get('SELECT id, maintenance_team_id, name FROM equipment WHERE id = ?', [equipmentId]);
     if (!equipment) throw notFound('Equipment not found');
     equipmentName = equipment.name;
     // Auto-fill team if not provided
@@ -274,38 +272,33 @@ router.post('/', route((req, res) => {
   }
 
   if (workCenterId) {
-    const wc = db.prepare('SELECT id, name FROM work_centers WHERE id = ?').get(workCenterId);
+    const wc = await db.get('SELECT id, name FROM work_centers WHERE id = ?', [workCenterId]);
     if (!wc) throw notFound('Work center not found');
     workCenterName = wc.name;
   }
 
   // A team supplied by the client must exist, or the row would carry a
   // reference that no join can resolve.
-  if (requestedTeamId) assertTeamExists(requestedTeamId);
+  if (requestedTeamId) await assertTeamExists(requestedTeamId);
 
-  const result = db.prepare(`
+  const created = await db.insert(`
     INSERT INTO maintenance_requests (
       type, subject, equipment_id, work_center_id, team_id, scheduled_date,
       status, created_by_user_id
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    type,
-    subject,
-    equipmentId,
-    workCenterId,
-    resolvedTeamId,
-    scheduledDate,
+  `, [
+    type, subject, equipmentId, workCenterId, resolvedTeamId, scheduledDate,
     'new', // Default status
     createdBy
-  );
+  ]);
 
-  audit(req.user.id, 'maintenance.create', 'maintenance_request', result.lastInsertRowid);
+  await audit(req.user.id, 'maintenance.create', 'maintenance_request', created.id);
 
   res.status(201).json({
     success: true,
     message: 'Maintenance request created successfully',
     data: {
-      id: result.lastInsertRowid,
+      id: created.id,
       team_id: resolvedTeamId,
       equipment_name: equipmentName,
       work_center_name: workCenterName
@@ -314,8 +307,8 @@ router.post('/', route((req, res) => {
 }));
 
 // Assign request to a technician (manager or technician can assign themselves)
-router.patch('/:id/assign', route((req, res) => {
-  const request = findRequest(req.params.id);
+router.patch('/:id/assign', route(async (req, res) => {
+  const request = await findRequest(req.params.id);
   const userId = requiredId((req.body || {}).user_id, 'User ID');
 
   // Closed work is a historical record; reassigning it would rewrite history.
@@ -334,7 +327,7 @@ router.patch('/:id/assign', route((req, res) => {
   }
 
   // Check if user exists and has appropriate role
-  const user = db.prepare('SELECT id, role FROM users WHERE id = ?').get(userId);
+  const user = await db.get('SELECT id, role FROM users WHERE id = ?', [userId]);
   if (!user) throw notFound('User not found');
 
   if (!['manager', 'technician'].includes(user.role)) {
@@ -343,22 +336,20 @@ router.patch('/:id/assign', route((req, res) => {
 
   // Verify user is a member of the request's team (if team is assigned)
   if (request.team_id) {
-    const isMember = db
-      .prepare('SELECT id FROM team_members WHERE team_id = ? AND user_id = ?')
-      .get(request.team_id, userId);
+    const isMember = await db.get('SELECT id FROM team_members WHERE team_id = ? AND user_id = ?', [request.team_id, userId]);
 
     if (!isMember && user.role !== 'manager') {
       throw forbidden('User must be a member of the assigned team');
     }
   }
 
-  db.prepare(`
+  await db.run(`
     UPDATE maintenance_requests
-    SET assigned_to_user_id = ?, updated_at = CURRENT_TIMESTAMP
+    SET assigned_to_user_id = ?, updated_at = now()
     WHERE id = ?
-  `).run(userId, request.id);
+  `, [userId, request.id]);
 
-  audit(req.user.id, 'maintenance.assign', 'maintenance_request', request.id, {
+  await audit(req.user.id, 'maintenance.assign', 'maintenance_request', request.id, {
     assigned_to_user_id: Number(userId)
   });
 
@@ -369,7 +360,7 @@ router.patch('/:id/assign', route((req, res) => {
 }));
 
 // Update request status (new -> in_progress -> repaired/scrap)
-router.patch('/:id/status', route((req, res) => {
+router.patch('/:id/status', route(async (req, res) => {
   const body = req.body || {};
 
   if (body.status === undefined || body.status === null || body.status === '') {
@@ -381,7 +372,7 @@ router.patch('/:id/status', route((req, res) => {
     max: MAX_DURATION_HOURS
   });
 
-  const request = findRequest(req.params.id);
+  const request = await findRequest(req.params.id);
 
   if (!['manager', 'admin'].includes(req.user.role)
       && !(req.user.role === 'technician' && Number(request.assigned_to_user_id) === Number(req.user.id))) {
@@ -395,19 +386,19 @@ router.patch('/:id/status', route((req, res) => {
 
   // Guard the transition in SQL as well, so two concurrent requests cannot both
   // move the same record out of the same starting state.
-  const updated = db.prepare(`
+  const updated = await db.run(`
     UPDATE maintenance_requests
     SET status = ?,
         duration_hours = COALESCE(?, duration_hours),
-        updated_at = CURRENT_TIMESTAMP
+        updated_at = now()
     WHERE id = ? AND status = ?
-  `).run(status, durationHours ?? null, request.id, request.status);
+  `, [status, durationHours ?? null, request.id, request.status]);
 
   if (updated.changes !== 1) {
     throw badRequest('The request status changed while this update was in flight');
   }
 
-  audit(req.user.id, 'maintenance.status', 'maintenance_request', request.id, {
+  await audit(req.user.id, 'maintenance.status', 'maintenance_request', request.id, {
     from: request.status,
     to: status
   });
@@ -419,35 +410,33 @@ router.patch('/:id/status', route((req, res) => {
 }));
 
 // Add note to request (for scrap logging or general comments)
-router.post('/:id/notes', route((req, res) => {
+router.post('/:id/notes', route(async (req, res) => {
   const message = requiredString((req.body || {}).message, 'Note message', LIMITS.note);
-  const request = findRequest(req.params.id);
+  const request = await findRequest(req.params.id);
 
   if (!canAccess(req, request)) throw forbidden('You do not have access to this request');
 
   // Authorship comes from the session, never the body - the same rule the
   // request creator follows.
-  const result = db
-    .prepare('INSERT INTO notes (request_id, message, created_by_user_id) VALUES (?, ?, ?)')
-    .run(request.id, message, req.user.id);
+  const created = await db.insert('INSERT INTO notes (request_id, message, created_by_user_id) VALUES (?, ?, ?)', [request.id, message, req.user.id]);
 
-  audit(req.user.id, 'maintenance.note.create', 'maintenance_request', request.id, {
-    note_id: Number(result.lastInsertRowid)
+  await audit(req.user.id, 'maintenance.note.create', 'maintenance_request', request.id, {
+    note_id: Number(created.id)
   });
 
   res.status(201).json({
     success: true,
     message: 'Note added successfully',
-    data: { id: result.lastInsertRowid }
+    data: { id: created.id }
   });
 }));
 
 // Update maintenance request details.
 // Only supplied fields are written; the request keeps its current target unless
 // the caller explicitly names a different one.
-router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
+router.put('/:id', authorize('manager', 'admin'), route(async (req, res) => {
   const body = req.body || {};
-  const existing = findRequest(req.params.id);
+  const existing = await findRequest(req.params.id);
 
   // Don't allow editing completed requests
   if (CLOSED_STATUSES.includes(existing.status)) {
@@ -475,9 +464,7 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
   // Switching target: naming one clears the other, but omitting both leaves the
   // existing target untouched.
   if (equipmentId) {
-    const equipment = db
-      .prepare('SELECT id, maintenance_team_id FROM equipment WHERE id = ?')
-      .get(equipmentId);
+    const equipment = await db.get('SELECT id, maintenance_team_id FROM equipment WHERE id = ?', [equipmentId]);
     if (!equipment) throw notFound('Equipment not found');
     updates.equipment_id = equipmentId;
     updates.work_center_id = null;
@@ -489,7 +476,7 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
       updates.team_id = equipment.maintenance_team_id;
     }
   } else if (workCenterId) {
-    const wc = db.prepare('SELECT id FROM work_centers WHERE id = ?').get(workCenterId);
+    const wc = await db.get('SELECT id FROM work_centers WHERE id = ?', [workCenterId]);
     if (!wc) throw notFound('Work center not found');
     updates.work_center_id = workCenterId;
     updates.equipment_id = null;
@@ -508,12 +495,11 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
   }
 
   const assignments = Object.keys(updates).map((column) => `${column} = ?`);
-  assignments.push('updated_at = CURRENT_TIMESTAMP');
+  assignments.push('updated_at = now()');
 
-  db.prepare(`UPDATE maintenance_requests SET ${assignments.join(', ')} WHERE id = ?`)
-    .run(...Object.values(updates), existing.id);
+  await db.run(`UPDATE maintenance_requests SET ${assignments.join(', ')} WHERE id = ?`, [...Object.values(updates), existing.id]);
 
-  audit(req.user.id, 'maintenance.update', 'maintenance_request', existing.id, {
+  await audit(req.user.id, 'maintenance.update', 'maintenance_request', existing.id, {
     fields: Object.keys(updates)
   });
 
@@ -524,20 +510,19 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
 }));
 
 // Delete maintenance request
-router.delete('/:id', authorize('manager', 'admin'), route((req, res) => {
-  const existing = findRequest(req.params.id, 'id, subject, status');
+router.delete('/:id', authorize('manager', 'admin'), route(async (req, res) => {
+  const existing = await findRequest(req.params.id, 'id, subject, status');
 
   // Notes cascade via the foreign key, but be explicit so the behaviour holds
-  // even on a database opened without foreign key enforcement.
-  const remove = db.transaction(() => {
-    db.prepare('DELETE FROM notes WHERE request_id = ?').run(existing.id);
-    db.prepare('DELETE FROM maintenance_requests WHERE id = ?').run(existing.id);
+  // even against a schema where the cascade was not applied.
+  await db.tx(async (trx) => {
+    await trx.run('DELETE FROM notes WHERE request_id = ?', [existing.id]);
+    await trx.run('DELETE FROM maintenance_requests WHERE id = ?', [existing.id]);
   });
-  remove();
 
   // Recorded after the fact: once the row is gone the audit entry is the only
   // remaining trace of what was removed.
-  audit(req.user.id, 'maintenance.delete', 'maintenance_request', existing.id, {
+  await audit(req.user.id, 'maintenance.delete', 'maintenance_request', existing.id, {
     subject: existing.subject,
     status: existing.status
   });

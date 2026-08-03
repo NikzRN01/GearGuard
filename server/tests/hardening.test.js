@@ -297,7 +297,12 @@ test('error responses never leak SQL, file paths or stack traces', async () => {
   for (const [method, path, body] of probes) {
     const res = await h.request(method, path, body ? { body } : {});
     const text = res.text || '';
-    assert.ok(!/SQLITE_/.test(text), `${method} ${path} leaked a SQLite error code: ${text}`);
+    // Driver-level detail must never reach a client: PostgreSQL SQLSTATE codes,
+    // constraint names, and the relation/column names in a raw pg error all
+    // describe the schema to anyone probing the API.
+    assert.ok(!/\b23\d{3}\b|\b42\w{3}\b/.test(text), `${method} ${path} leaked a SQLSTATE code: ${text}`);
+    assert.ok(!/violates \w+ constraint|relation "\w+" does not exist/i.test(text),
+      `${method} ${path} leaked a database error: ${text}`);
     assert.ok(!/\bat .+\.js:\d+/.test(text), `${method} ${path} leaked a stack trace: ${text}`);
     assert.ok(!/[A-Za-z]:\\|\/home\/|node_modules/.test(text), `${method} ${path} leaked a path: ${text}`);
   }

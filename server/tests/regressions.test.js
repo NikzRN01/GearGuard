@@ -15,11 +15,12 @@ test.after(() => h.stop());
 
 /* ------------------------------------------------------- suite isolation */
 
-test('no suite can open the real database', () => {
-  // Requiring ../server or ../database runs database.js immediately, so a file
-  // that imports either before pointing SQLITE_DB_PATH somewhere else writes
-  // straight into the developer's server/portal.db. One suite did exactly that,
-  // filling it with test sessions, audit rows and signup accounts on every run.
+test('no suite can run against the default schema', () => {
+  // Requiring ../server or ../database builds the connection pool immediately,
+  // so a file that imports either before the environment is configured runs
+  // against whatever DATABASE_URL points at - in a developer's shell, their own
+  // working database. One suite did exactly that under SQLite, filling the
+  // checked-out portal.db with test sessions and signup accounts on every run.
   const dir = __dirname;
   const files = fs.readdirSync(dir).filter((name) => name.endsWith('.test.js'));
   assert.ok(files.length > 0, 'no suites found to check');
@@ -28,23 +29,26 @@ test('no suite can open the real database', () => {
   for (const name of files) {
     const source = fs.readFileSync(path.join(dir, name), 'utf8');
 
-    // Requiring the shared harness is enough: helpers.js sets the path itself.
-    if (/require\(['"]\.\/helpers['"]\)/.test(source)) continue;
-
     const appImport = source.search(/require\(['"]\.\.\/(server|database)['"]\)/);
     if (appImport === -1) continue;
 
-    const dbPathSet = source.search(/process\.env\.SQLITE_DB_PATH\s*=/);
-    if (dbPathSet === -1 || dbPathSet > appImport) offenders.push(name);
+    // helpers.js requires testEnv itself, so either import counts - as long as
+    // it comes first.
+    const envImport = source.search(/require\(['"]\.\/(helpers|testEnv)['"]\)/);
+    if (envImport === -1 || envImport > appImport) offenders.push(name);
   }
 
-  assert.deepEqual(offenders, [], `these suites would run against server/portal.db: ${offenders.join(', ')}`);
+  assert.deepEqual(offenders, [], `these suites would run against the default schema: ${offenders.join(', ')}`);
 });
 
-test('the harness never points at the checked-in database', () => {
-  assert.ok(process.env.SQLITE_DB_PATH, 'the suite must name its own database file');
-  const inRepo = path.resolve(__dirname, '..', 'portal.db');
-  assert.notEqual(path.resolve(process.env.SQLITE_DB_PATH), inRepo);
+test('the harness runs in its own schema and cannot send mail', () => {
+  assert.ok(process.env.DB_SCHEMA, 'the suite must name its own schema');
+  assert.match(
+    process.env.DB_SCHEMA,
+    /^test_/,
+    'a test run must stay inside a test_ schema so it cannot touch real tables'
+  );
+  assert.ok(process.env.DATABASE_URL, 'the suite must name its own database');
   assert.equal(process.env.MAIL_TRANSPORT, 'json', 'no run may reach a real mailbox');
 });
 
@@ -130,9 +134,7 @@ test('an email address is the same account whatever its case', async () => {
     assert.equal(duplicate.status, 409, `signup with ${variant} should collide, got ${duplicate.status}`);
   }
 
-  const rows = h.db
-    .prepare('SELECT COUNT(*) AS count FROM users WHERE LOWER(email) = ?')
-    .get(address.toLowerCase());
+  const rows = await h.db.get('SELECT COUNT(*) AS count FROM users WHERE LOWER(email) = ?', [address.toLowerCase()]);
   assert.equal(rows.count, 1, 'only one account may exist for an address');
 });
 
@@ -159,13 +161,16 @@ test('password recovery finds the account whatever case is typed', async () => {
   assert.ok(res.body.resetToken, 'a token should be issued for the matching account');
 });
 
-test('the database refuses two accounts differing only by case', () => {
+test('the database refuses two accounts differing only by case', async () => {
   const address = `Direct-${h.uid()}@Example.com`;
-  const insert = h.db.prepare('INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)');
-  insert.run('A', address, 'x', 'user');
-  assert.throws(
-    () => insert.run('B', address.toLowerCase(), 'x', 'user'),
-    /UNIQUE/i,
+  const insert = (name, email) => h.db.run(
+    'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
+    [name, email, 'x', 'user']
+  );
+  await insert('A', address);
+  await assert.rejects(
+    () => insert('B', address.toLowerCase()),
+    /duplicate key value violates unique constraint/i,
     'the case-insensitive index is the real guarantee, not the route check'
   );
 });
@@ -183,7 +188,7 @@ test('control characters and bidi overrides are stripped from stored text', asyn
   for (const [label, name, expectedPrefix] of cases) {
     const res = await h.post('/api/teams', { name });
     assert.equal(res.status, 201, `${label}: ${res.text}`);
-    const row = h.db.prepare('SELECT name FROM teams WHERE id = ?').get(res.body.data.id);
+    const row = await h.db.get('SELECT name FROM teams WHERE id = ?', [res.body.data.id]);
     assert.ok(row.name.startsWith(expectedPrefix), `${label}: stored ${JSON.stringify(row.name)}`);
     // eslint-disable-next-line no-control-regex
     assert.doesNotMatch(row.name, /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/, label);
@@ -200,7 +205,7 @@ test('ordinary text survives sanitising untouched', async () => {
   const name = `Métrologie ✓ 中文 ${h.uid()}`;
   const res = await h.post('/api/teams', { name });
   assert.equal(res.status, 201);
-  const row = h.db.prepare('SELECT name FROM teams WHERE id = ?').get(res.body.data.id);
+  const row = await h.db.get('SELECT name FROM teams WHERE id = ?', [res.body.data.id]);
   assert.equal(row.name, name, 'accents, CJK and symbols are legitimate content');
 });
 
@@ -209,7 +214,7 @@ test('a multi-line note keeps its line breaks', async () => {
   const message = 'first line\nsecond line\ttabbed';
   const res = await h.post(`/api/maintenance/${request.id}/notes`, { message });
   assert.equal(res.status, 201);
-  const row = h.db.prepare('SELECT message FROM notes WHERE id = ?').get(res.body.data.id);
+  const row = await h.db.get('SELECT message FROM notes WHERE id = ?', [res.body.data.id]);
   assert.equal(row.message, message);
 });
 
@@ -221,7 +226,7 @@ test('editing a request does not discard the team a manager chose', async () => 
   const equipment = await h.createEquipment({ maintenance_team_id: equipmentTeam.id });
   const request = await h.createRequest({ equipment_id: equipment.id, team_id: chosenTeam.id });
 
-  const before = h.db.prepare('SELECT team_id FROM maintenance_requests WHERE id = ?').get(request.id);
+  const before = await h.db.get('SELECT team_id FROM maintenance_requests WHERE id = ?', [request.id]);
   assert.equal(before.team_id, chosenTeam.id, 'precondition: the manager-chosen team is stored');
 
   // This is exactly what the manager edit form sends when only the date changes:
@@ -236,7 +241,7 @@ test('editing a request does not discard the team a manager chose', async () => 
   });
   assert.equal(res.status, 200, res.text);
 
-  const after = h.db.prepare('SELECT team_id, scheduled_date FROM maintenance_requests WHERE id = ?').get(request.id);
+  const after = await h.db.get('SELECT team_id, scheduled_date FROM maintenance_requests WHERE id = ?', [request.id]);
   assert.equal(after.scheduled_date, '2027-03-04', 'the requested change should still apply');
   assert.equal(after.team_id, chosenTeam.id, 'resaving the same equipment must not reset the team');
 });
@@ -251,7 +256,7 @@ test('pointing a request at different equipment does adopt that team', async () 
   const res = await h.put(`/api/maintenance/${request.id}`, { equipment_id: equipmentB.id });
   assert.equal(res.status, 200, res.text);
 
-  const after = h.db.prepare('SELECT team_id, equipment_id FROM maintenance_requests WHERE id = ?').get(request.id);
+  const after = await h.db.get('SELECT team_id, equipment_id FROM maintenance_requests WHERE id = ?', [request.id]);
   assert.equal(after.equipment_id, equipmentB.id);
   assert.equal(after.team_id, teamB.id, 'a genuine target change should pick up the new default team');
 });
@@ -260,26 +265,29 @@ test('a request with no team adopts the equipment team on edit', async () => {
   const team = await h.createTeam();
   const bare = await h.createEquipment();
   const request = await h.createRequest({ equipment_id: bare.id });
-  h.db.prepare('UPDATE maintenance_requests SET team_id = NULL WHERE id = ?').run(request.id);
-  h.db.prepare('UPDATE equipment SET maintenance_team_id = ? WHERE id = ?').run(team.id, bare.id);
+  await h.db.run('UPDATE maintenance_requests SET team_id = NULL WHERE id = ?', [request.id]);
+  await h.db.run('UPDATE equipment SET maintenance_team_id = ? WHERE id = ?', [team.id, bare.id]);
 
   await h.put(`/api/maintenance/${request.id}`, { equipment_id: bare.id, subject: 'still untargeted' });
-  const after = h.db.prepare('SELECT team_id FROM maintenance_requests WHERE id = ?').get(request.id);
+  const after = await h.db.get('SELECT team_id FROM maintenance_requests WHERE id = ?', [request.id]);
   assert.equal(after.team_id, team.id, 'filling an empty team from the equipment is still helpful');
 });
 
 /* ------------------------------------------------------------------- audit */
 
-const auditActions = (resourceId) => h.db
-  .prepare("SELECT action FROM audit_log WHERE resource_type = 'maintenance_request' AND resource_id = ? ORDER BY id")
-  .all(String(resourceId))
-  .map((row) => row.action);
+const auditActions = async (resourceId) => {
+  const rows = await h.db.all(
+    "SELECT action FROM audit_log WHERE resource_type = 'maintenance_request' AND resource_id = ? ORDER BY id",
+    [String(resourceId)]
+  );
+  return rows.map((row) => row.action);
+};
 
 test('editing a request is recorded in the audit log', async () => {
   const request = await h.createRequest();
   await h.put(`/api/maintenance/${request.id}`, { subject: 'edited subject' });
 
-  const actions = auditActions(request.id);
+  const actions = await auditActions(request.id);
   assert.ok(actions.includes('maintenance.update'), `edit was not audited: ${JSON.stringify(actions)}`);
 });
 
@@ -287,9 +295,7 @@ test('deleting a request is recorded, including what was removed', async () => {
   const request = await h.createRequest({ subject: 'about to vanish' });
   await h.del(`/api/maintenance/${request.id}`);
 
-  const row = h.db
-    .prepare("SELECT action, metadata_json FROM audit_log WHERE action = 'maintenance.delete' AND resource_id = ?")
-    .get(String(request.id));
+  const row = await h.db.get("SELECT action, metadata_json FROM audit_log WHERE action = 'maintenance.delete' AND resource_id = ?", [String(request.id)]);
   assert.ok(row, 'a deletion must leave a trace once the row itself is gone');
   assert.equal(JSON.parse(row.metadata_json).subject, 'about to vanish');
 });
@@ -297,7 +303,7 @@ test('deleting a request is recorded, including what was removed', async () => {
 test('every audited action the admin console knows about can actually occur', async () => {
   // Guards against the label map and the emitted action names drifting apart.
   const emitted = new Set(
-    h.db.prepare('SELECT DISTINCT action FROM audit_log').all().map((row) => row.action)
+    (await h.db.all('SELECT DISTINCT action FROM audit_log')).map((row) => row.action)
   );
   for (const action of ['auth.login', 'maintenance.create', 'maintenance.update', 'maintenance.delete']) {
     assert.ok(emitted.has(action), `${action} is never written`);

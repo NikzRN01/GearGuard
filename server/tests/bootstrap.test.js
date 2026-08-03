@@ -11,15 +11,23 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const crypto = require('crypto');
 const { spawnSync } = require('child_process');
+const { Pool } = require('pg');
 
 const serverDir = path.join(__dirname, '..');
 
-const freshDbPath = () =>
-  path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'gearguard-boot-')), 'portal.db');
+const DATABASE_URL = process.env.TEST_DATABASE_URL
+  || process.env.DATABASE_URL
+  || 'postgresql://gearguard:gearguard@127.0.0.1:55432/gearguard';
+
+/** A schema name unique to each boot, so scenarios never see each other's rows. */
+const freshSchema = () => `boot_${crypto.randomBytes(6).toString('hex')}`;
+
+/** Schemas created by this file, dropped once at the end. */
+const createdSchemas = [];
 
 /**
  * Boots database.js in a child process and reports what ended up in `users`.
@@ -29,10 +37,16 @@ const freshDbPath = () =>
  * of the behaviour under test, not incidental noise.
  */
 const boot = (env = {}) => {
+  const schema = freshSchema();
+  createdSchemas.push(schema);
+
   const script = `
     const db = require(${JSON.stringify(path.join(serverDir, 'database.js'))});
-    const users = db.prepare('SELECT email, role FROM users ORDER BY email').all();
-    process.stdout.write('USERS:' + JSON.stringify(users) + '\\n');
+    db.initializeDatabase()
+      .then(() => db.all('SELECT email, role FROM users ORDER BY email'))
+      .then((users) => { process.stdout.write('USERS:' + JSON.stringify(users) + '\\n'); })
+      .then(() => db.close())
+      .catch((error) => { console.error(error); process.exit(1); });
   `;
 
   const child = spawnSync(process.execPath, ['-e', script], {
@@ -42,7 +56,8 @@ const boot = (env = {}) => {
       ...process.env,
       // dotenv must not pull the developer's own .env into these cases.
       DOTENV_CONFIG_PATH: path.join(os.tmpdir(), 'gearguard-nonexistent.env'),
-      SQLITE_DB_PATH: freshDbPath(),
+      DATABASE_URL,
+      DB_SCHEMA: schema,
       NODE_ENV: '',
       VERCEL: '',
       SEED_DEMO_DATA: '',
@@ -61,6 +76,18 @@ const boot = (env = {}) => {
   if (!line) throw new Error(`boot produced no user list: ${output}`);
   return { users: JSON.parse(line.slice('USERS:'.length)), output };
 };
+
+// Each boot leaves a schema behind; clean them up once rather than per test.
+test.after(async () => {
+  const pool = new Pool({ connectionString: DATABASE_URL });
+  try {
+    for (const schema of createdSchemas) {
+      await pool.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`).catch(() => {});
+    }
+  } finally {
+    await pool.end().catch(() => {});
+  }
+});
 
 test('development still seeds the demo accounts', () => {
   const { users } = boot({ NODE_ENV: 'development' });

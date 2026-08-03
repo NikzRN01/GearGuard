@@ -41,24 +41,31 @@ const parseWorkCenterFields = (body = {}) => ({
   status: optionalEnum(body.status, 'Status', STATUSES)
 });
 
-const findWorkCenter = (rawId) => {
+const findWorkCenter = async (rawId) => {
   const id = toId(rawId);
   if (!id) throw notFound('Work center not found');
-  const wc = db.prepare('SELECT * FROM work_centers WHERE id = ?').get(id);
+  const wc = await db.get('SELECT * FROM work_centers WHERE id = ?', [id]);
   if (!wc) throw notFound('Work center not found');
   return wc;
 };
 
-/** Maps a UNIQUE violation onto the field that actually collided. */
+/**
+ * Maps a UNIQUE violation onto the field that actually collided.
+ *
+ * PostgreSQL names the offending constraint on the error (`work_centers_code_key`
+ * for a UNIQUE column), which is far more reliable than the message text this
+ * used to parse out of SQLite.
+ */
 const conflictForUnique = (error) => {
-  if (/work_centers\.code/i.test(error.message)) {
+  const target = `${error?.constraint || ''} ${error?.detail || ''} ${error?.message || ''}`;
+  if (/code/i.test(target)) {
     return conflict('Work center with this code already exists');
   }
   return conflict('Work center with this name already exists');
 };
 
 // List work centers with optional filters
-router.get('/', route((req, res) => {
+router.get('/', route(async (req, res) => {
   const { status, search } = req.query;
   let query = `
     SELECT wc.* FROM work_centers wc
@@ -78,48 +85,46 @@ router.get('/', route((req, res) => {
   }
   query += ' ORDER BY wc.name';
 
-  const data = db.prepare(query).all(...params);
+  const data = await db.all(query, params);
   res.json({ success: true, data });
 }));
 
 // Get single work center with alternatives
-router.get('/:id', route((req, res) => {
-  const wc = findWorkCenter(req.params.id);
-  const alternatives = db.prepare(`
+router.get('/:id', route(async (req, res) => {
+  const wc = await findWorkCenter(req.params.id);
+  const alternatives = await db.all(`
     SELECT wca.id, wca.alternative_work_center_id as alt_id, wc2.name as alt_name
     FROM work_center_alternatives wca
     JOIN work_centers wc2 ON wc2.id = wca.alternative_work_center_id
     WHERE wca.work_center_id = ?
     ORDER BY wc2.name
-  `).all(wc.id);
+  `, [wc.id]);
   res.json({ success: true, data: { ...wc, alternatives } });
 }));
 
 // Create work center
-router.post('/', authorize('manager', 'admin'), route((req, res) => {
+router.post('/', authorize('manager', 'admin'), route(async (req, res) => {
   const body = req.body || {};
   const name = requiredString(body.name, 'Name', LIMITS.name);
   const fields = parseWorkCenterFields(body);
 
-  const dup = db.prepare('SELECT id FROM work_centers WHERE name = ?').get(name);
+  const dup = await db.get('SELECT id FROM work_centers WHERE name = ?', [name]);
   if (dup) {
     throw conflict('Work center with this name already exists');
   }
   if (fields.code) {
-    const codeDup = db.prepare('SELECT id FROM work_centers WHERE code = ?').get(fields.code);
+    const codeDup = await db.get('SELECT id FROM work_centers WHERE code = ?', [fields.code]);
     if (codeDup) throw conflict('Work center with this code already exists');
   }
 
-  const stmt = db.prepare(`
-    INSERT INTO work_centers (
-      name, code, tag, cost_per_hour, capacity_per_hour,
-      time_efficiency_pct, oee_target_pct, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  let result;
+  let created;
   try {
-    result = stmt.run(
+    created = await db.insert(`
+      INSERT INTO work_centers (
+        name, code, tag, cost_per_hour, capacity_per_hour,
+        time_efficiency_pct, oee_target_pct, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
       name,
       fields.code ?? null,
       fields.tag ?? null,
@@ -128,33 +133,33 @@ router.post('/', authorize('manager', 'admin'), route((req, res) => {
       fields.time_efficiency_pct ?? 100,
       fields.oee_target_pct ?? 0,
       fields.status ?? 'active'
-    );
+    ]);
   } catch (error) {
     if (isUniqueViolation(error)) throw conflictForUnique(error);
     throw error;
   }
 
-  audit(req.user.id, 'workcenter.create', 'work_center', result.lastInsertRowid, {
+  await audit(req.user.id, 'workcenter.create', 'work_center', created.id, {
     name,
     code: fields.code ?? null
   });
 
-  res.status(201).json({ success: true, message: 'Work center created', data: { id: result.lastInsertRowid } });
+  res.status(201).json({ success: true, message: 'Work center created', data: { id: created.id } });
 }));
 
 // Update work center. Only supplied fields are written.
-router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
-  const wc = findWorkCenter(req.params.id);
+router.put('/:id', authorize('manager', 'admin'), route(async (req, res) => {
+  const wc = await findWorkCenter(req.params.id);
   const fields = parseWorkCenterFields(req.body || {});
 
   if (fields.name === null) throw badRequest('Name cannot be blank');
 
   if (fields.name) {
-    const dup = db.prepare('SELECT id FROM work_centers WHERE name = ? AND id != ?').get(fields.name, wc.id);
+    const dup = await db.get('SELECT id FROM work_centers WHERE name = ? AND id != ?', [fields.name, wc.id]);
     if (dup) throw conflict('Work center with this name already exists');
   }
   if (fields.code) {
-    const codeDup = db.prepare('SELECT id FROM work_centers WHERE code = ? AND id != ?').get(fields.code, wc.id);
+    const codeDup = await db.get('SELECT id FROM work_centers WHERE code = ? AND id != ?', [fields.code, wc.id]);
     if (codeDup) throw conflict('Work center with this code already exists');
   }
 
@@ -172,7 +177,7 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
   if (assignments.length > 0) {
     params.push(wc.id);
     try {
-      db.prepare(`UPDATE work_centers SET ${assignments.join(', ')} WHERE id = ?`).run(...params);
+      await db.run(`UPDATE work_centers SET ${assignments.join(', ')} WHERE id = ?`, params);
     } catch (error) {
       if (isUniqueViolation(error)) throw conflictForUnique(error);
       throw error;
@@ -180,18 +185,18 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
   }
 
   if (Object.keys(changes).length > 0) {
-    audit(req.user.id, 'workcenter.update', 'work_center', wc.id, { changes });
+    await audit(req.user.id, 'workcenter.update', 'work_center', wc.id, { changes });
   }
 
   res.json({ success: true, message: 'Work center updated' });
 }));
 
 // Soft delete (deactivate) work center
-router.delete('/:id', authorize('manager', 'admin'), route((req, res) => {
-  const wc = findWorkCenter(req.params.id);
-  db.prepare("UPDATE work_centers SET status = 'inactive' WHERE id = ?").run(wc.id);
+router.delete('/:id', authorize('manager', 'admin'), route(async (req, res) => {
+  const wc = await findWorkCenter(req.params.id);
+  await db.run("UPDATE work_centers SET status = 'inactive' WHERE id = ?", [wc.id]);
 
-  audit(req.user.id, 'workcenter.deactivate', 'work_center', wc.id, {
+  await audit(req.user.id, 'workcenter.deactivate', 'work_center', wc.id, {
     name: wc.name,
     status: { from: wc.status, to: 'inactive' }
   });
@@ -200,20 +205,20 @@ router.delete('/:id', authorize('manager', 'admin'), route((req, res) => {
 }));
 
 // Alternatives
-router.get('/:id/alternatives', route((req, res) => {
-  const wc = findWorkCenter(req.params.id);
-  const rows = db.prepare(`
+router.get('/:id/alternatives', route(async (req, res) => {
+  const wc = await findWorkCenter(req.params.id);
+  const rows = await db.all(`
     SELECT wca.id, wca.alternative_work_center_id as alt_id, wc2.name as alt_name
     FROM work_center_alternatives wca
     JOIN work_centers wc2 ON wc2.id = wca.alternative_work_center_id
     WHERE wca.work_center_id = ?
     ORDER BY wc2.name
-  `).all(wc.id);
+  `, [wc.id]);
   res.json({ success: true, data: rows });
 }));
 
-router.post('/:id/alternatives', authorize('manager', 'admin'), route((req, res) => {
-  const wc = findWorkCenter(req.params.id);
+router.post('/:id/alternatives', authorize('manager', 'admin'), route(async (req, res) => {
+  const wc = await findWorkCenter(req.params.id);
   const alternativeId = requiredId(
     (req.body || {}).alternative_work_center_id,
     'alternative_work_center_id'
@@ -223,39 +228,35 @@ router.post('/:id/alternatives', authorize('manager', 'admin'), route((req, res)
     throw badRequest('A work center cannot be its own alternative');
   }
 
-  const exists = db.prepare('SELECT id FROM work_centers WHERE id = ?').get(alternativeId);
+  const exists = await db.get('SELECT id FROM work_centers WHERE id = ?', [alternativeId]);
   if (!exists) throw notFound('Alternative work center not found');
 
-  let result;
+  let created;
   try {
-    result = db
-      .prepare('INSERT INTO work_center_alternatives (work_center_id, alternative_work_center_id) VALUES (?, ?)')
-      .run(wc.id, alternativeId);
+    created = await db.insert('INSERT INTO work_center_alternatives (work_center_id, alternative_work_center_id) VALUES (?, ?)', [wc.id, alternativeId]);
   } catch (error) {
     if (isUniqueViolation(error)) throw conflict('Alternative already linked');
     throw error;
   }
 
-  audit(req.user.id, 'workcenter.alternative.add', 'work_center', wc.id, {
+  await audit(req.user.id, 'workcenter.alternative.add', 'work_center', wc.id, {
     alternative_work_center_id: Number(alternativeId)
   });
 
-  res.status(201).json({ success: true, message: 'Alternative added', data: { id: result.lastInsertRowid } });
+  res.status(201).json({ success: true, message: 'Alternative added', data: { id: created.id } });
 }));
 
-router.delete('/:id/alternatives/:altId', authorize('manager', 'admin'), route((req, res) => {
+router.delete('/:id/alternatives/:altId', authorize('manager', 'admin'), route(async (req, res) => {
   const workCenterId = toId(req.params.id);
   const altId = toId(req.params.altId);
   if (!workCenterId || !altId) throw notFound('Alternative link not found');
 
-  const existing = db
-    .prepare('SELECT id, alternative_work_center_id FROM work_center_alternatives WHERE id = ? AND work_center_id = ?')
-    .get(altId, workCenterId);
+  const existing = await db.get('SELECT id, alternative_work_center_id FROM work_center_alternatives WHERE id = ? AND work_center_id = ?', [altId, workCenterId]);
   if (!existing) throw notFound('Alternative link not found');
 
-  db.prepare('DELETE FROM work_center_alternatives WHERE id = ?').run(altId);
+  await db.run('DELETE FROM work_center_alternatives WHERE id = ?', [altId]);
 
-  audit(req.user.id, 'workcenter.alternative.remove', 'work_center', workCenterId, {
+  await audit(req.user.id, 'workcenter.alternative.remove', 'work_center', workCenterId, {
     alternative_work_center_id: existing.alternative_work_center_id
   });
 

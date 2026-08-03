@@ -218,10 +218,11 @@ function validatePassword(password) {
   return errors;
 }
 
-/** True when a better-sqlite3 error is a UNIQUE constraint violation. */
-const isUniqueViolation = (error) =>
-  error && typeof error.code === 'string' && error.code.startsWith('SQLITE_CONSTRAINT') &&
-  /UNIQUE/i.test(String(error.message));
+/** PostgreSQL's unique_violation. */
+const UNIQUE_VIOLATION = '23505';
+
+/** True when a driver error is a UNIQUE constraint violation. */
+const isUniqueViolation = (error) => error?.code === UNIQUE_VIOLATION;
 
 module.exports = {
   HttpError,

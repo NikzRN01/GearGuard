@@ -35,14 +35,14 @@ const parseEquipmentFields = (body = {}) => ({
   status: optionalString(body.status, 'Status', 40)
 });
 
-const assertTeamExists = (teamId) => {
+const assertTeamExists = async (teamId) => {
   if (!teamId) return;
-  const team = db.prepare('SELECT id FROM teams WHERE id = ?').get(teamId);
+  const team = await db.get('SELECT id FROM teams WHERE id = ?', [teamId]);
   if (!team) throw notFound('Maintenance team not found');
 };
 
 // Get all equipment
-router.get('/', route((req, res) => {
+router.get('/', route(async (req, res) => {
   const { department, employee, status } = req.query;
 
   let query = `
@@ -72,24 +72,24 @@ router.get('/', route((req, res) => {
 
   query += ' ORDER BY e.created_at DESC, e.id DESC';
 
-  const equipment = db.prepare(query).all(...params);
+  const equipment = await db.all(query, params);
 
   res.json({ success: true, data: equipment });
 }));
 
 // Get single equipment by ID
-router.get('/:id', route((req, res) => {
+router.get('/:id', route(async (req, res) => {
   const id = toId(req.params.id);
   if (!id) throw notFound('Equipment not found');
 
-  const equipment = db.prepare(`
+  const equipment = await db.get(`
     SELECT
       e.*,
       t.name as team_name
     FROM equipment e
     LEFT JOIN teams t ON e.maintenance_team_id = t.id
     WHERE e.id = ?
-  `).get(id);
+  `, [id]);
 
   if (!equipment) throw notFound('Equipment not found');
 
@@ -97,7 +97,7 @@ router.get('/:id', route((req, res) => {
 }));
 
 // Create new equipment
-router.post('/', authorize('manager', 'admin'), route((req, res) => {
+router.post('/', authorize('manager', 'admin'), route(async (req, res) => {
   const body = req.body || {};
 
   // Validate required fields
@@ -106,24 +106,22 @@ router.post('/', authorize('manager', 'admin'), route((req, res) => {
   const fields = parseEquipmentFields(body);
 
   // Check for duplicate serial number
-  const existing = db.prepare('SELECT id FROM equipment WHERE serial_number = ?').get(serialNumber);
+  const existing = await db.get('SELECT id FROM equipment WHERE serial_number = ?', [serialNumber]);
   if (existing) {
     throw conflict('Equipment with this serial number already exists');
   }
 
   // Validate team exists if provided
-  assertTeamExists(fields.maintenance_team_id);
+  await assertTeamExists(fields.maintenance_team_id);
 
-  const stmt = db.prepare(`
-    INSERT INTO equipment (
-      name, serial_number, category, department, assigned_employee_name,
-      purchase_date, warranty_end_date, location, maintenance_team_id, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  let result;
+  let created;
   try {
-    result = stmt.run(
+    created = await db.insert(`
+      INSERT INTO equipment (
+        name, serial_number, category, department, assigned_employee_name,
+        purchase_date, warranty_end_date, location, maintenance_team_id, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
       name,
       serialNumber,
       fields.category ?? null,
@@ -134,13 +132,13 @@ router.post('/', authorize('manager', 'admin'), route((req, res) => {
       fields.location ?? null,
       fields.maintenance_team_id ?? null,
       fields.status ?? 'active'
-    );
+    ]);
   } catch (error) {
     if (isUniqueViolation(error)) throw conflict('Equipment with this serial number already exists');
     throw error;
   }
 
-  audit(req.user.id, 'equipment.create', 'equipment', result.lastInsertRowid, {
+  await audit(req.user.id, 'equipment.create', 'equipment', created.id, {
     name,
     serial_number: serialNumber
   });
@@ -148,20 +146,20 @@ router.post('/', authorize('manager', 'admin'), route((req, res) => {
   res.status(201).json({
     success: true,
     message: 'Equipment created successfully',
-    data: { id: result.lastInsertRowid }
+    data: { id: created.id }
   });
 }));
 
 // Update equipment.
 // Only the fields present in the body are written, so a partial update cannot
 // silently blank out columns the caller never mentioned.
-router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
+router.put('/:id', authorize('manager', 'admin'), route(async (req, res) => {
   const id = toId(req.params.id);
   if (!id) throw notFound('Equipment not found');
 
   // The whole row, not just the id: the audit entry records what each changed
   // column held before, which is the part an investigation actually needs.
-  const existing = db.prepare('SELECT * FROM equipment WHERE id = ?').get(id);
+  const existing = await db.get('SELECT * FROM equipment WHERE id = ?', [id]);
   if (!existing) throw notFound('Equipment not found');
 
   const fields = parseEquipmentFields(req.body || {});
@@ -171,16 +169,14 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
 
   // Check for duplicate serial number (excluding current equipment)
   if (fields.serial_number) {
-    const duplicate = db
-      .prepare('SELECT id FROM equipment WHERE serial_number = ? AND id != ?')
-      .get(fields.serial_number, id);
+    const duplicate = await db.get('SELECT id FROM equipment WHERE serial_number = ? AND id != ?', [fields.serial_number, id]);
     if (duplicate) {
       throw conflict('Equipment with this serial number already exists');
     }
   }
 
   // Validate team exists if provided
-  assertTeamExists(fields.maintenance_team_id);
+  await assertTeamExists(fields.maintenance_team_id);
 
   const assignments = [];
   const params = [];
@@ -197,7 +193,7 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
   if (assignments.length > 0) {
     params.push(id);
     try {
-      db.prepare(`UPDATE equipment SET ${assignments.join(', ')} WHERE id = ?`).run(...params);
+      await db.run(`UPDATE equipment SET ${assignments.join(', ')} WHERE id = ?`, params);
     } catch (error) {
       if (isUniqueViolation(error)) {
         throw conflict('Equipment with this serial number already exists');
@@ -207,7 +203,7 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
   }
 
   if (Object.keys(changes).length > 0) {
-    audit(req.user.id, 'equipment.update', 'equipment', id, { changes });
+    await audit(req.user.id, 'equipment.update', 'equipment', id, { changes });
   }
 
   res.json({
@@ -217,26 +213,24 @@ router.put('/:id', authorize('manager', 'admin'), route((req, res) => {
 }));
 
 // Delete equipment
-router.delete('/:id', authorize('manager', 'admin'), route((req, res) => {
+router.delete('/:id', authorize('manager', 'admin'), route(async (req, res) => {
   const id = toId(req.params.id);
   if (!id) throw notFound('Equipment not found');
 
-  const existing = db.prepare('SELECT id, name, serial_number FROM equipment WHERE id = ?').get(id);
+  const existing = await db.get('SELECT id, name, serial_number FROM equipment WHERE id = ?', [id]);
   if (!existing) throw notFound('Equipment not found');
 
   // Check if equipment has maintenance requests
-  const hasRequests = db
-    .prepare('SELECT id FROM maintenance_requests WHERE equipment_id = ? LIMIT 1')
-    .get(id);
+  const hasRequests = await db.get('SELECT id FROM maintenance_requests WHERE equipment_id = ? LIMIT 1', [id]);
   if (hasRequests) {
     throw badRequest('Cannot delete equipment with existing maintenance requests');
   }
 
-  db.prepare('DELETE FROM equipment WHERE id = ?').run(id);
+  await db.run('DELETE FROM equipment WHERE id = ?', [id]);
 
   // Recorded after the fact: once the row is gone the audit entry is the only
   // remaining trace of what was removed.
-  audit(req.user.id, 'equipment.delete', 'equipment', id, {
+  await audit(req.user.id, 'equipment.delete', 'equipment', id, {
     name: existing.name,
     serial_number: existing.serial_number
   });

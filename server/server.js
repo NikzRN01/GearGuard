@@ -9,9 +9,28 @@ const workCenterRoutes = require('./routes/workCenterRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const { authenticate, requireCsrf } = require('./middleware/auth');
 const { HttpError } = require('./lib/validation');
+const db = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+/**
+ * Migrations and seeding, started at import and awaited before any request is
+ * served.
+ *
+ * With SQLite this happened synchronously during `require`, so by the time the
+ * module finished loading the schema existed. PostgreSQL is async, so the
+ * promise is held here and every request gates on it - otherwise a serverless
+ * instance could answer a query against a database it has not migrated yet.
+ */
+const ready = db.initializeDatabase();
+
+// A rejection here means the process can never serve traffic. Log it now rather
+// than leaving an unhandled rejection to surface without context; requests get
+// the same error through the gate below.
+ready.catch((error) => {
+  console.error('Database initialization failed:', error.message);
+});
 
 // Behind a proxy (Vercel, nginx, a load balancer) every request arrives from the
 // proxy's address, so req.ip is identical for everyone and the auth rate limiter
@@ -59,6 +78,17 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
+// No route runs before migrations have finished. Resolved after the first boot,
+// so this costs one already-settled promise per request thereafter.
+app.use(async (req, res, next) => {
+  try {
+    await ready;
+    next();
+  } catch {
+    res.status(503).json({ success: false, message: 'Service is starting up' });
+  }
+});
+
 // Routes. Everything except /api/auth requires a session and, for unsafe
 // methods, a matching CSRF token.
 app.use('/api/auth', (req, res, next) => {
@@ -88,9 +118,17 @@ app.get('/api', (req, res) => {
   });
 });
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'Server is running', timestamp: new Date() });
+// Health check. A process that cannot reach its database is not healthy, so
+// this actually queries rather than reporting on the process alone - an
+// orchestrator or uptime monitor needs the difference.
+app.get('/api/health', async (req, res) => {
+  try {
+    await db.healthcheck();
+    res.json({ status: 'ok', database: 'ok', timestamp: new Date() });
+  } catch (error) {
+    console.error('Health check failed:', error.message);
+    res.status(503).json({ status: 'degraded', database: 'unreachable', timestamp: new Date() });
+  }
 });
 
 // Unknown paths answer in JSON, matching the rest of the API.
@@ -118,14 +156,41 @@ app.use((error, req, res, next) => {
   res.status(500).json({ success: false, message: 'Internal server error' });
 });
 
-// Export app for serverless runtimes (Vercel)
+// Export app for serverless runtimes (Vercel). `ready` is attached so tests and
+// tooling can await migrations without reaching into the database module.
 module.exports = app;
+module.exports.ready = ready;
 
 // Start server only when run directly in a local/non-serverless environment.
 // Importing this module (serverless runtimes, tests, tooling) must never bind a port.
 if (require.main === module && !process.env.VERCEL) {
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
     console.log(`Health check: http://localhost:${PORT}/api/health`);
   });
+
+  // Stop accepting connections, let in-flight requests finish, then hand the
+  // pooled PostgreSQL connections back before exiting. Without this a redeploy
+  // severs live requests and leaves connections held until the server times
+  // them out - which matters on Neon, where the branch has a connection ceiling.
+  const shutdown = (signal) => {
+    console.log(`${signal} received, shutting down.`);
+    server.close(async () => {
+      try {
+        await db.close();
+      } catch (error) {
+        console.error('Error closing the database pool:', error.message);
+      }
+      process.exit(0);
+    });
+
+    // A client holding a connection open must not block the deploy forever.
+    setTimeout(() => {
+      console.error('Shutdown timed out, exiting.');
+      process.exit(1);
+    }, 10_000).unref();
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }

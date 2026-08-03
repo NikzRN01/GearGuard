@@ -127,9 +127,10 @@ test('SECURITY: the creator is taken from the session, not the request body', as
   });
   assert.equal(res.status, 201, res.text);
 
-  const stored = h.db
-    .prepare('SELECT created_by_user_id FROM maintenance_requests WHERE id = ?')
-    .get(res.body.data.id);
+  const stored = await h.db.get(
+    'SELECT created_by_user_id FROM maintenance_requests WHERE id = ?',
+    [res.body.data.id]
+  );
   assert.equal(stored.created_by_user_id, author.user.id);
   assert.notEqual(stored.created_by_user_id, victim.id);
 });
@@ -476,11 +477,8 @@ test('DELETE /api/maintenance/:id removes the request and its notes', async () =
   const after = await h.get(`/api/maintenance/${request.id}`);
   assert.equal(after.status, 404);
 
-  const Database = require('better-sqlite3');
-  const db = new Database(h.dbFile, { readonly: true });
-  const orphans = db.prepare('SELECT COUNT(1) AS c FROM notes WHERE request_id = ?').get(request.id);
-  db.close();
-  assert.equal(orphans.c, 0, 'notes must not survive their request');
+  const orphans = await h.db.get('SELECT COUNT(1) AS c FROM notes WHERE request_id = ?', [request.id]);
+  assert.equal(Number(orphans.c), 0, 'notes must not survive their request');
 });
 
 test('DELETE /api/maintenance/:id returns 404 for an unknown request', async () => {

@@ -75,8 +75,8 @@ const normalizeEmail = (value, field = 'Email') => {
 /** The comparison key for an address. Matches the UNIQUE INDEX on LOWER(email). */
 const emailKey = (value) => String(value).trim().toLowerCase();
 
-const findUserByEmail = (email, columns = '*') =>
-  db.prepare(`SELECT ${columns} FROM users WHERE LOWER(email) = ?`).get(emailKey(email));
+const findUserByEmail = async (email, columns = '*') =>
+  await db.get(`SELECT ${columns} FROM users WHERE LOWER(email) = ?`, [emailKey(email)]);
 
 /**
  * Built lazily so a missing SMTP configuration cannot break module loading, and
@@ -145,18 +145,16 @@ router.post('/signup', signupRateLimit, route(async (req, res) => {
   const cleanPassword = assertPasswordPolicy(password, 'Password');
 
   // Check if user already exists, ignoring case.
-  const existingUser = findUserByEmail(cleanEmail, 'id');
+  const existingUser = await findUserByEmail(cleanEmail, 'id');
   if (existingUser) {
     throw conflict('Account already exists with this email');
   }
 
   const hashedPassword = await bcrypt.hash(cleanPassword, BCRYPT_ROUNDS);
 
-  let result;
+  let created;
   try {
-    result = db
-      .prepare('INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)')
-      .run(cleanName, cleanEmail, hashedPassword, cleanRole || 'user');
+    created = await db.insert('INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)', [cleanName, cleanEmail, hashedPassword, cleanRole || 'user']);
   } catch (error) {
     // Two concurrent signups can both pass the check above; the UNIQUE index
     // is the real arbiter.
@@ -167,7 +165,7 @@ router.post('/signup', signupRateLimit, route(async (req, res) => {
   res.status(201).json({
     success: true,
     message: 'User created successfully',
-    userId: result.lastInsertRowid
+    userId: created.id
   });
 }));
 
@@ -183,7 +181,7 @@ router.post('/login', loginRateLimit, route(async (req, res) => {
     throw badRequest('Email and password must be text');
   }
 
-  const user = findUserByEmail(email);
+  const user = await findUserByEmail(email);
 
   // Compare against a throwaway hash when the account does not exist, so both
   // the response time and the status code stay identical for unknown emails
@@ -202,9 +200,9 @@ router.post('/login', loginRateLimit, route(async (req, res) => {
 
   // Issue the session as an HttpOnly cookie; the CSRF token is returned in the
   // body so the client can echo it on unsafe requests.
-  const session = createSession(user.id);
+  const session = await createSession(user.id);
   setSessionCookie(res, session.token);
-  audit(user.id, 'auth.login', 'session', null, { role: user.role });
+  await audit(user.id, 'auth.login', 'session', null, { role: user.role });
 
   // Successful login - return user data (excluding password)
   const { password: _, ...userWithoutPassword } = user;
@@ -219,7 +217,7 @@ router.post('/login', loginRateLimit, route(async (req, res) => {
 }));
 
 // Who am I - lets the client rehydrate identity from the cookie alone.
-router.get('/me', authenticate, route((req, res) => {
+router.get('/me', authenticate, route(async (req, res) => {
   res.json({
     success: true,
     user: req.user,
@@ -228,9 +226,9 @@ router.get('/me', authenticate, route((req, res) => {
   });
 }));
 
-router.post('/logout', authenticate, requireCsrf, route((req, res) => {
-  audit(req.user.id, 'auth.logout', 'session');
-  destroySession(req);
+router.post('/logout', authenticate, requireCsrf, route(async (req, res) => {
+  await audit(req.user.id, 'auth.logout', 'session');
+  await destroySession(req);
   clearSessionCookie(res);
   res.json({ success: true, message: 'Logged out successfully' });
 }));
@@ -244,7 +242,7 @@ router.post('/forget-password', recoveryRateLimit, route(async (req, res) => {
   }
   const cleanEmail = normalizeEmail(email);
 
-  const user = findUserByEmail(cleanEmail, 'id, name, email');
+  const user = await findUserByEmail(cleanEmail, 'id, name, email');
 
   // Always answer identically, whether or not the account exists.
   const genericResponse = {
@@ -259,14 +257,11 @@ router.post('/forget-password', recoveryRateLimit, route(async (req, res) => {
   const token = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS).toISOString();
 
-  const issue = db.transaction(() => {
+  await db.tx(async (trx) => {
     // A new request supersedes any outstanding token for this account.
-    db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(user.id);
-    db.prepare(
-      'INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)'
-    ).run(user.id, hashToken(token), expiresAt);
+    await trx.run('DELETE FROM password_reset_tokens WHERE user_id = ?', [user.id]);
+    await trx.run('INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)', [user.id, hashToken(token), expiresAt]);
   });
-  issue();
 
   // The token alone identifies the account, so the link carries nothing else.
   const resetUrl = `${appBaseUrl()}/reset-password?token=${encodeURIComponent(token)}`;
@@ -325,37 +320,34 @@ router.post('/reset-password', recoveryRateLimit, route(async (req, res) => {
   const cleanToken = requiredString(token, 'Reset token', 200);
   const invalidToken = badRequest('This password reset link is invalid or has expired');
 
-  const record = db.prepare(`
+  const record = await db.get(`
     SELECT prt.id, prt.user_id, prt.expires_at, prt.used_at
     FROM password_reset_tokens prt
     JOIN users u ON u.id = prt.user_id
     WHERE prt.token_hash = ?
-  `).get(hashToken(cleanToken));
+  `, [hashToken(cleanToken)]);
 
   if (!record || record.used_at) throw invalidToken;
   if (Date.parse(record.expires_at) <= Date.now()) throw invalidToken;
 
   const hashedPassword = await bcrypt.hash(cleanPassword, BCRYPT_ROUNDS);
 
-  const apply = db.transaction(() => {
+  const applied = await db.tx(async (trx) => {
     // Re-check inside the transaction so two concurrent resets cannot both win.
-    const claimed = db.prepare(
-      'UPDATE password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE id = ? AND used_at IS NULL'
-    ).run(record.id);
+    const claimed = await trx.run('UPDATE password_reset_tokens SET used_at = now() WHERE id = ? AND used_at IS NULL', [record.id]);
     if (claimed.changes !== 1) return false;
 
-    db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashedPassword, record.user_id);
+    await trx.run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, record.user_id]);
     // Any other outstanding token for this account is now void, and so is every
     // active session: a password change must log out anyone already signed in.
-    db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ? AND id != ?')
-      .run(record.user_id, record.id);
-    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(record.user_id);
+    await trx.run('DELETE FROM password_reset_tokens WHERE user_id = ? AND id != ?', [record.user_id, record.id]);
+    await trx.run('DELETE FROM sessions WHERE user_id = ?', [record.user_id]);
     return true;
   });
 
-  if (!apply()) throw invalidToken;
+  if (!applied) throw invalidToken;
 
-  audit(record.user_id, 'auth.password_reset', 'user', record.user_id);
+  await audit(record.user_id, 'auth.password_reset', 'user', record.user_id);
 
   res.status(200).json({
     success: true,
