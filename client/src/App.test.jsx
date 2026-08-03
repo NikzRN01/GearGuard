@@ -62,7 +62,7 @@ describe('App navigation', () => {
     signIn('admin');
     renderShell();
     expect(navLinks()).toEqual(['Control Center', 'User Access', 'Requests', 'Schedule', 'Team Workload', 'Equipment', 'Work Centers', 'Teams']);
-    expect(screen.getByText('System administrator')).toBeInTheDocument();
+    expect(screen.queryByText('System administrator')).not.toBeInTheDocument();
   });
 
   it('labels the workspace for each role', () => {

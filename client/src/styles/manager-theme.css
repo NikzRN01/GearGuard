@@ -108,7 +108,7 @@
   width: 248px;
   height: 100vh;
   overflow: hidden;
-  padding: clamp(10px, 2vh, var(--gg-space-5)) var(--gg-space-3);
+  padding: clamp(12px, 2vh, var(--gg-space-5)) var(--gg-space-3);
   border-right: 1px solid var(--gg-color-border);
   background: var(--gg-color-surface);
   box-shadow: none;
@@ -267,6 +267,109 @@
   border-color: var(--gg-color-accent);
   background: var(--gg-color-primary);
   color: var(--gg-color-primary-contrast);
+}
+
+/* Sidebar refinement: richer depth and clearer navigation hierarchy while
+   preserving the fixed, compact shell and every role-specific route. */
+.manager-sidebar.app-sidebar {
+  border-right-color: color-mix(in srgb, var(--gg-color-primary) 18%, var(--gg-color-border));
+  background:
+    radial-gradient(circle at 16% 3%, color-mix(in srgb, var(--gg-color-primary) 12%, transparent), transparent 23%),
+    linear-gradient(180deg, var(--gg-color-surface), color-mix(in srgb, var(--gg-color-surface-subtle) 58%, var(--gg-color-surface)));
+  box-shadow: 8px 0 28px rgba(0, 0, 0, .12);
+}
+
+.manager-sidebar__brand {
+  margin: 0 0 clamp(8px, 1.5vh, var(--gg-space-4));
+  padding: clamp(6px, 1.2vh, var(--gg-space-3)) var(--gg-space-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.manager-sidebar__mark {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(145deg, var(--gg-color-primary), color-mix(in srgb, var(--gg-color-primary) 72%, white));
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--gg-color-primary) 24%, transparent);
+}
+
+.manager-sidebar__group-label {
+  color: color-mix(in srgb, var(--gg-color-text-muted) 86%, var(--gg-color-primary-text));
+  margin-top: clamp(12px, 2.1vh, var(--gg-space-6));
+  margin-bottom: clamp(6px, 1vh, var(--gg-space-3));
+}
+
+.manager-sidebar a,
+.manager-sidebar summary {
+  position: relative;
+  min-height: clamp(38px, 5vh, 44px);
+  padding-inline: 14px;
+  border: 1px solid transparent;
+  transition: background-color var(--gg-duration-fast) var(--gg-ease-standard), border-color var(--gg-duration-fast) var(--gg-ease-standard), color var(--gg-duration-fast) var(--gg-ease-standard), box-shadow var(--gg-duration-fast) var(--gg-ease-standard), transform var(--gg-duration-fast) var(--gg-ease-emphasized);
+}
+
+.manager-sidebar a:hover,
+.manager-sidebar summary:hover {
+  border-color: color-mix(in srgb, var(--gg-color-border-strong) 58%, transparent);
+  transform: none;
+}
+
+.manager-sidebar a.active {
+  border-color: color-mix(in srgb, var(--gg-color-primary) 52%, var(--gg-color-border));
+  background: linear-gradient(100deg, var(--gg-color-primary), color-mix(in srgb, var(--gg-color-primary) 78%, var(--gg-color-surface-raised)));
+  box-shadow: inset 3px 0 var(--gg-color-accent-bright), 0 7px 16px color-mix(in srgb, var(--gg-color-primary) 14%, transparent);
+}
+
+.manager-sidebar__footer {
+  gap: clamp(9px, 1.4vh, var(--gg-space-4));
+  margin-inline: 0;
+  padding: clamp(12px, 1.8vh, var(--gg-space-4)) var(--gg-space-2) 0;
+  border: 0;
+  border-top: 1px solid var(--gg-color-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.manager-sidebar__user {
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--gg-space-2);
+}
+
+.manager-sidebar__user .manager-sidebar__avatar {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--gg-color-border-strong);
+  border-radius: 50%;
+  background: var(--gg-color-primary-soft);
+  color: var(--gg-color-primary-text);
+  font-size: var(--gg-text-xs);
+  font-weight: 850;
+}
+
+.manager-sidebar__identity {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.manager-sidebar__identity > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manager-theme-toggle,
+.manager-sidebar .sidebar-logout {
+  transition: background-color var(--gg-duration-fast) var(--gg-ease-standard), border-color var(--gg-duration-fast) var(--gg-ease-standard), color var(--gg-duration-fast) var(--gg-ease-standard), transform var(--gg-duration-fast) var(--gg-ease-emphasized);
+}
+
+.manager-theme-toggle:hover,
+.manager-sidebar .sidebar-logout:hover {
+  transform: translateY(-1px);
 }
 
 .gg-eyebrow {
@@ -1142,6 +1245,22 @@
   text-transform: uppercase;
 }
 
+.manager-sidebar__navigation {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 3px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.manager-sidebar__navigation::-webkit-scrollbar {
+  display: none;
+}
+
 .manager-shell .manager-request-row__primary strong {
   line-height: 1.35;
 }
@@ -1195,8 +1314,17 @@
   z-index: 3;
   align-items: center;
   padding: var(--gg-space-6);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--gg-color-primary-soft) 82%, var(--gg-color-surface)), var(--gg-color-surface) 72%);
+  border-bottom: 1px solid var(--gg-color-border);
+  background: var(--gg-color-surface-raised);
   box-shadow: 0 1px 0 var(--gg-color-border);
+}
+
+.manager-shell .manager-detail-heading > div {
+  min-width: 0;
+}
+
+.manager-shell .manager-detail-heading .gg-badge {
+  flex: 0 0 auto;
 }
 
 .manager-shell .manager-detail-heading h2 {
@@ -1204,6 +1332,7 @@
   margin-top: var(--gg-space-1);
   font-size: clamp(1.15rem, 2vw, 1.45rem);
   line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .manager-shell .manager-detail-grid {
@@ -1246,6 +1375,84 @@
 .manager-shell .manager-form-section--controls {
   grid-template-columns: 1fr;
   align-items: stretch;
+}
+
+.manager-shell .manager-form-section--assignment {
+  grid-template-columns: minmax(0, 200px) minmax(0, 1fr) 176px;
+  align-items: start;
+  column-gap: var(--gg-space-4);
+}
+
+.manager-shell .manager-form-section--assignment .manager-assignment-field,
+.manager-shell .manager-form-section--assignment .gg-select-menu {
+  width: 100%;
+  min-width: 0;
+}
+
+.manager-shell .manager-form-section--assignment .manager-section-intro {
+  align-self: center;
+}
+
+.manager-shell .manager-form-section--assignment .manager-assignment-action-wrap {
+  display: grid;
+  width: 176px;
+  min-width: 0;
+  align-self: start;
+  justify-self: end;
+  gap: 6px;
+}
+
+.manager-shell .manager-form-section--assignment .manager-assignment-action-wrap > span {
+  visibility: hidden;
+  color: var(--gg-color-text-secondary);
+  font-size: var(--gg-text-xs);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.manager-shell .manager-form-section--assignment .manager-assignment-action {
+  width: 176px;
+  min-width: 0;
+  padding-inline: var(--gg-space-3);
+  white-space: nowrap;
+}
+
+.manager-shell .manager-form-section--assignment .gg-select-menu__trigger {
+  min-height: 46px;
+  padding-inline: var(--gg-space-4);
+}
+
+.manager-shell .manager-form-section--schedule {
+  grid-template-columns: minmax(0, 200px) minmax(0, 1fr) 160px;
+  align-items: start;
+  column-gap: var(--gg-space-4);
+}
+
+.manager-shell .manager-form-section--schedule .manager-section-intro {
+  align-self: center;
+}
+
+.manager-shell .manager-form-section--schedule .manager-schedule-action-wrap {
+  display: grid;
+  width: 160px;
+  min-width: 0;
+  align-self: start;
+  justify-self: end;
+  gap: 6px;
+}
+
+.manager-shell .manager-form-section--schedule .manager-schedule-action-wrap > span {
+  visibility: hidden;
+  color: var(--gg-color-text-secondary);
+  font-size: var(--gg-text-xs);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.manager-shell .manager-form-section--schedule .manager-schedule-action {
+  width: 160px;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .manager-shell .manager-section-intro {
@@ -1355,6 +1562,36 @@
   .manager-shell .manager-history {
     margin-inline: var(--gg-space-3);
     padding: var(--gg-space-4);
+  }
+
+  .manager-shell .manager-form-section--assignment {
+    grid-template-columns: 1fr;
+    row-gap: var(--gg-space-4);
+  }
+
+  .manager-shell .manager-form-section--schedule {
+    grid-template-columns: 1fr;
+    row-gap: var(--gg-space-4);
+  }
+
+  .manager-shell .manager-form-section--assignment .manager-assignment-action-wrap,
+  .manager-shell .manager-form-section--assignment .manager-assignment-action {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .manager-shell .manager-form-section--assignment .manager-assignment-action-wrap > span {
+    display: none;
+  }
+
+  .manager-shell .manager-form-section--schedule .manager-schedule-action-wrap,
+  .manager-shell .manager-form-section--schedule .manager-schedule-action {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .manager-shell .manager-form-section--schedule .manager-schedule-action-wrap > span {
+    display: none;
   }
 
   .manager-shell .manager-request-actions .manager-delete-request {
@@ -1617,8 +1854,30 @@
   padding: 0;
 }
 
+.manager-shell .manager-workload-page > .gg-panel {
+  border-radius: calc(var(--gg-radius-lg) + 2px);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--gg-color-text) 6%, transparent);
+}
+
+.manager-shell .manager-workload-page > .gg-panel .gg-panel__header {
+  padding: var(--gg-space-4) var(--gg-space-5);
+  background: linear-gradient(120deg, var(--gg-color-surface-raised), var(--gg-color-surface));
+}
+
+.manager-shell .manager-workload-page > .gg-panel .gg-eyebrow {
+  margin-bottom: var(--gg-space-1);
+  color: var(--gg-color-primary-text);
+  letter-spacing: .1em;
+}
+
+.manager-shell .manager-workload-page > .gg-panel .gg-panel__header h2 {
+  font-size: clamp(1.15rem, 1.5vw, 1.35rem);
+}
+
 .manager-shell .manager-workload-table-wrap {
-  overflow-x: auto;
+  max-height: min(68vh, 720px);
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .manager-shell .manager-workload-table {
@@ -1633,16 +1892,30 @@
 
 .manager-shell .manager-workload-table th,
 .manager-shell .manager-workload-table td {
-  height: 66px;
-  padding-inline: var(--gg-space-5);
+  height: 60px;
+  padding-inline: var(--gg-space-4);
 }
 
 .manager-shell .manager-workload-table thead th {
-  height: 50px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 46px;
+  border-bottom-color: var(--gg-color-border-strong);
+  background: var(--gg-color-surface-subtle);
   color: var(--gg-color-text-muted);
-  font-size: var(--gg-text-xs);
-  font-weight: 750;
-  letter-spacing: .02em;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.manager-shell .manager-workload-table tbody tr:nth-child(even) > * {
+  background: color-mix(in srgb, var(--gg-color-surface-subtle) 26%, var(--gg-color-surface));
+}
+
+.manager-shell .manager-workload-table tbody tr:hover > * {
+  background: var(--gg-color-primary-soft);
 }
 
 .manager-shell .manager-workload-table thead th:nth-child(n + 3):nth-child(-n + 5),
@@ -1665,11 +1938,12 @@
 
 .manager-shell .manager-workload-avatar {
   display: grid;
-  flex: 0 0 40px;
-  width: 40px;
-  height: 40px;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
   place-items: center;
-  border-radius: 13px;
+  border: 1px solid var(--gg-color-border-accent);
+  border-radius: 11px;
   background: var(--gg-color-primary-soft-strong);
   color: var(--gg-color-primary-text);
   font-weight: 800;
@@ -1699,10 +1973,27 @@
 }
 
 .manager-shell .manager-workload-metric strong {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--gg-color-border);
+  border-radius: 11px;
+  background: var(--gg-color-surface-raised);
   color: var(--gg-color-text);
-  font-size: 1.1rem;
+  font-size: .95rem;
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
+}
+
+.manager-shell .manager-workload-table td:nth-child(3) strong {
+  border-color: var(--gg-color-border-accent);
+  background: var(--gg-color-primary-soft);
+  color: var(--gg-color-primary-text);
+}
+
+.manager-shell .manager-workload-table td:nth-child(4) strong {
+  background: var(--gg-color-info-soft);
 }
 
 .manager-shell .manager-workload-action {
@@ -1710,7 +2001,15 @@
 }
 
 .manager-shell .manager-workload-action .gg-button {
-  min-width: 116px;
+  min-width: 112px;
+  border-color: var(--gg-color-border);
+  background: var(--gg-color-surface-raised);
+  color: var(--gg-color-primary-text);
+}
+
+.manager-shell .manager-workload-action .gg-button:hover:not(:disabled) {
+  border-color: var(--gg-color-primary);
+  background: var(--gg-color-primary-soft);
 }
 
 @media (max-width: 640px) {
@@ -2106,7 +2405,454 @@
   text-decoration-color: currentColor;
 }
 
+/* Keep asset rows compact and aligned when long equipment names wrap. */
+.manager-shell .manager-equipment-table tbody th,
+.manager-shell .manager-equipment-table tbody td {
+  height: 62px;
+  padding-block: var(--gg-space-3);
+  vertical-align: middle;
+}
+
+.manager-shell .manager-equipment-table tbody th:first-child {
+  width: 220px;
+  min-width: 220px;
+}
+
+.manager-shell .manager-equipment-table .manager-table-link {
+  display: block;
+  width: 100%;
+  max-width: 190px;
+  line-height: 1.2;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.manager-shell .manager-equipment-table .manager-equipment-actions-heading,
+.manager-shell .manager-equipment-table .manager-equipment-action-cell {
+  width: 150px;
+  min-width: 150px;
+}
+
+.manager-shell .manager-equipment-action-cell .manager-inline-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--gg-space-2);
+}
+
+.manager-shell .manager-equipment-action-cell .gg-button {
+  width: 100%;
+  padding-inline: var(--gg-space-2);
+}
+
+/* Equipment register: a compact operational directory rather than a raw data
+   grid. The table remains semantic and every existing action is unchanged. */
+.manager-shell .manager-equipment-page > .gg-panel {
+  border-radius: calc(var(--gg-radius-lg) + 2px);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--gg-color-text) 6%, transparent);
+}
+
+.manager-shell .manager-equipment-page > .gg-panel .gg-panel__header {
+  padding: var(--gg-space-5) var(--gg-space-6);
+  background: linear-gradient(120deg, var(--gg-color-surface-raised), var(--gg-color-surface));
+}
+
+.manager-shell .manager-equipment-page > .gg-panel .gg-eyebrow {
+  margin-bottom: var(--gg-space-1);
+  color: var(--gg-color-primary-text);
+  letter-spacing: .1em;
+}
+
+.manager-shell .manager-equipment-page > .gg-panel .gg-panel__header h2 {
+  font-size: clamp(1.15rem, 1.5vw, 1.35rem);
+}
+
+.manager-shell .manager-equipment-page > .gg-panel .gg-panel__body {
+  padding: 0;
+}
+
+.manager-shell .manager-equipment-page .table-wrap {
+  max-height: min(68vh, 720px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.manager-shell .manager-equipment-table {
+  min-width: 1040px;
+  margin: 0;
+  table-layout: fixed;
+}
+
+.manager-shell .manager-equipment-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.manager-shell .manager-equipment-table thead th {
+  padding: 13px var(--gg-space-4);
+  border-bottom: 1px solid var(--gg-color-border-strong);
+  background: var(--gg-color-surface-subtle);
+  color: var(--gg-color-text-muted);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .065em;
+  text-transform: uppercase;
+}
+
+.manager-shell .manager-equipment-table tbody tr {
+  transition: background-color var(--gg-duration-fast) var(--gg-ease-standard), box-shadow var(--gg-duration-fast) var(--gg-ease-standard);
+}
+
+.manager-shell .manager-equipment-table tbody tr:nth-child(even) > * {
+  background: color-mix(in srgb, var(--gg-color-surface-subtle) 42%, var(--gg-color-surface));
+}
+
+.manager-shell .manager-equipment-table tbody tr:hover > * {
+  background: var(--gg-color-primary-soft);
+}
+
+.manager-shell .manager-equipment-table tbody th,
+.manager-shell .manager-equipment-table tbody td {
+  height: 58px;
+  padding: 9px var(--gg-space-3);
+  color: var(--gg-color-text-secondary);
+  font-size: .82rem;
+  line-height: 1.32;
+}
+
+.manager-shell .manager-equipment-table thead th:first-child,
+.manager-shell .manager-equipment-table tbody th:first-child {
+  width: 190px;
+  min-width: 190px;
+}
+
+.manager-shell .manager-equipment-table th:nth-child(2) { width: 112px; }
+.manager-shell .manager-equipment-table th:nth-child(3) { width: 122px; }
+.manager-shell .manager-equipment-table th:nth-child(4) { width: 120px; }
+.manager-shell .manager-equipment-table th:nth-child(5) { width: 128px; }
+.manager-shell .manager-equipment-table th:nth-child(6) { width: 120px; }
+.manager-shell .manager-equipment-table th:nth-child(7) { width: 112px; }
+
+.manager-shell .manager-equipment-table .manager-table-link {
+  display: inline-flex;
+  max-width: 166px;
+  align-items: center;
+  gap: var(--gg-space-2);
+  color: var(--gg-color-primary-text);
+  font-size: .86rem;
+  line-height: 1.25;
+}
+
+.manager-shell .manager-equipment-table .manager-table-link::before {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--gg-color-primary);
+  box-shadow: 0 0 0 4px var(--gg-color-primary-soft);
+  content: '';
+}
+
+.manager-shell .manager-equipment-action-cell .gg-button--tertiary {
+  border-color: var(--gg-color-border);
+  background: var(--gg-color-surface-raised);
+  color: var(--gg-color-primary-text);
+}
+
+.manager-shell .manager-equipment-action-cell .gg-button--tertiary:hover:not(:disabled) {
+  border-color: var(--gg-color-primary);
+  background: var(--gg-color-primary-soft);
+}
+
 /* Modals inherit the global tokens; only the scrim is defined here. */
+.manager-shell .manager-workcenter-page > .gg-panel {
+  border-radius: calc(var(--gg-radius-lg) + 2px);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--gg-color-text) 6%, transparent);
+}
+
+.manager-shell .manager-workcenter-page > .gg-panel .gg-panel__header {
+  padding: var(--gg-space-5) var(--gg-space-6);
+  background: linear-gradient(120deg, var(--gg-color-surface-raised), var(--gg-color-surface));
+}
+
+.manager-shell .manager-workcenter-page > .gg-panel .gg-eyebrow {
+  margin-bottom: var(--gg-space-1);
+  color: var(--gg-color-primary-text);
+  letter-spacing: .1em;
+}
+
+.manager-shell .manager-workcenter-page > .gg-panel .gg-panel__header h2 {
+  font-size: clamp(1.15rem, 1.5vw, 1.35rem);
+}
+
+.manager-shell .manager-workcenter-page > .gg-panel .gg-panel__body {
+  padding: 0;
+}
+
+.manager-shell .manager-workcenter-page .table-wrap {
+  max-height: min(68vh, 720px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.manager-shell .manager-workcenter-table {
+  min-width: 1110px;
+  margin: 0;
+  table-layout: fixed;
+}
+
+.manager-shell .manager-workcenter-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.manager-shell .manager-workcenter-table thead th {
+  padding: 13px var(--gg-space-3);
+  border-bottom: 1px solid var(--gg-color-border-strong);
+  background: var(--gg-color-surface-subtle);
+  color: var(--gg-color-text-muted);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+.manager-shell .manager-workcenter-table tbody tr {
+  transition: background-color var(--gg-duration-fast) var(--gg-ease-standard);
+}
+
+.manager-shell .manager-workcenter-table tbody tr:nth-child(even) > * {
+  background: color-mix(in srgb, var(--gg-color-surface-subtle) 42%, var(--gg-color-surface));
+}
+
+.manager-shell .manager-workcenter-table tbody tr:hover > * {
+  background: var(--gg-color-primary-soft);
+}
+
+.manager-shell .manager-workcenter-table tbody th,
+.manager-shell .manager-workcenter-table tbody td {
+  height: 58px;
+  padding: 9px var(--gg-space-3);
+  color: var(--gg-color-text-secondary);
+  font-size: .82rem;
+  line-height: 1.32;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.manager-shell .manager-workcenter-table tbody th {
+  color: var(--gg-color-primary-text);
+  font-size: .86rem;
+  font-weight: 750;
+}
+
+.manager-shell .manager-workcenter-table tbody th::before {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: var(--gg-space-2);
+  border-radius: 50%;
+  background: var(--gg-color-primary);
+  box-shadow: 0 0 0 4px var(--gg-color-primary-soft);
+  content: '';
+  vertical-align: 1px;
+}
+
+.manager-shell .manager-workcenter-table th:nth-child(1) { width: 165px; }
+.manager-shell .manager-workcenter-table th:nth-child(2) { width: 88px; }
+.manager-shell .manager-workcenter-table th:nth-child(3) { width: 88px; }
+.manager-shell .manager-workcenter-table th:nth-child(4) { width: 170px; }
+.manager-shell .manager-workcenter-table th:nth-child(5),
+.manager-shell .manager-workcenter-table th:nth-child(6),
+.manager-shell .manager-workcenter-table th:nth-child(7),
+.manager-shell .manager-workcenter-table th:nth-child(8) { width: 102px; }
+
+.manager-shell .manager-workcenter-table .manager-number-cell {
+  color: var(--gg-color-text);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.manager-shell .manager-workcenter-table .manager-workcenter-actions-heading,
+.manager-shell .manager-workcenter-table .manager-workcenter-action-cell {
+  width: 170px;
+  min-width: 170px;
+  text-align: left;
+}
+
+.manager-shell .manager-workcenter-action-cell .manager-inline-actions {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: var(--gg-space-2);
+}
+
+.manager-shell .manager-workcenter-action-cell .gg-button {
+  width: 100%;
+  padding-inline: var(--gg-space-2);
+}
+
+.manager-shell .manager-workcenter-action-cell .gg-button--tertiary {
+  border-color: var(--gg-color-border);
+  background: var(--gg-color-surface-raised);
+  color: var(--gg-color-primary-text);
+}
+
+.manager-shell .manager-workcenter-action-cell .gg-button--tertiary:hover:not(:disabled) {
+  border-color: var(--gg-color-primary);
+  background: var(--gg-color-primary-soft);
+}
+
+.manager-shell .manager-teams-page > .gg-panel {
+  border-radius: calc(var(--gg-radius-lg) + 2px);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--gg-color-text) 6%, transparent);
+}
+
+.manager-shell .manager-teams-page > .gg-panel .gg-panel__header {
+  padding: var(--gg-space-4) var(--gg-space-5);
+  background: linear-gradient(120deg, var(--gg-color-surface-raised), var(--gg-color-surface));
+}
+
+.manager-shell .manager-teams-page > .gg-panel .gg-eyebrow {
+  margin-bottom: var(--gg-space-1);
+  color: var(--gg-color-primary-text);
+  letter-spacing: .1em;
+}
+
+.manager-shell .manager-teams-page > .gg-panel .gg-panel__header h2 {
+  font-size: clamp(1.15rem, 1.5vw, 1.35rem);
+}
+
+.manager-shell .manager-teams-page > .gg-panel .gg-panel__body {
+  padding: 0;
+}
+
+.manager-shell .manager-teams-page .table-wrap {
+  max-height: min(68vh, 720px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.manager-shell .manager-teams-table {
+  min-width: 760px;
+  margin: 0;
+  table-layout: fixed;
+}
+
+.manager-shell .manager-teams-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.manager-shell .manager-teams-table thead th {
+  padding: 13px var(--gg-space-4);
+  border-bottom: 1px solid var(--gg-color-border-strong);
+  background: var(--gg-color-surface-subtle);
+  color: var(--gg-color-text-muted);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .065em;
+  text-transform: uppercase;
+}
+
+.manager-shell .manager-teams-table tbody tr:nth-child(even) > * {
+  background: color-mix(in srgb, var(--gg-color-surface-subtle) 26%, var(--gg-color-surface));
+}
+
+.manager-shell .manager-teams-table tbody tr:hover > * {
+  background: var(--gg-color-primary-soft);
+}
+
+.manager-shell .manager-teams-table tbody th,
+.manager-shell .manager-teams-table tbody td {
+  height: 60px;
+  padding: 10px var(--gg-space-4);
+  color: var(--gg-color-text-secondary);
+  font-size: .86rem;
+  line-height: 1.35;
+  vertical-align: middle;
+}
+
+.manager-shell .manager-teams-table tbody th {
+  width: 300px;
+  color: var(--gg-color-primary-text);
+  font-size: .92rem;
+  font-weight: 750;
+  text-align: left;
+}
+
+.manager-shell .manager-teams-table tbody th::before {
+  display: inline-block;
+  width: 3px;
+  height: 22px;
+  margin-right: var(--gg-space-2);
+  border-radius: var(--gg-radius-pill);
+  background: var(--gg-color-primary);
+  content: '';
+  vertical-align: -6px;
+}
+
+.manager-shell .manager-teams-table thead th:first-child {
+  width: 300px;
+}
+
+.manager-shell .manager-team-members-summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--gg-space-3);
+}
+
+.manager-shell .manager-team-member-count {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--gg-color-border-accent);
+  border-radius: 50%;
+  background: var(--gg-color-primary-soft);
+  color: var(--gg-color-primary-text);
+  font-size: .75rem;
+  font-weight: 800;
+}
+
+.manager-shell .manager-team-members-summary > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manager-shell .manager-teams-table .manager-team-actions-heading,
+.manager-shell .manager-teams-table .manager-team-action {
+  width: 276px;
+  min-width: 276px;
+}
+
+.manager-shell .manager-team-action .manager-inline-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--gg-space-2);
+}
+
+.manager-shell .manager-team-action .gg-button {
+  width: 100%;
+  padding-inline: var(--gg-space-2);
+}
+
+.manager-shell .manager-team-action .gg-button--tertiary {
+  border-color: var(--gg-color-border);
+  background: var(--gg-color-surface-raised);
+  color: var(--gg-color-primary-text);
+}
+
+.manager-shell .manager-team-action .gg-button--tertiary:hover:not(:disabled) {
+  border-color: var(--gg-color-primary);
+  background: var(--gg-color-primary-soft);
+}
+
 .manager-workcenter-overlay,
 .manager-teams-overlay {
   background: var(--gg-color-overlay);
@@ -2885,6 +3631,11 @@
     display: none;
   }
 
+  .manager-sidebar__navigation {
+    min-height: 0;
+    overscroll-behavior: contain;
+  }
+
   .manager-sidebar__footer {
     display: grid;
   }
@@ -2965,6 +3716,25 @@
     text-align: right;
   }
 
+  .manager-shell .manager-equipment-table tbody th:first-child,
+  .manager-shell .manager-equipment-table tbody th,
+  .manager-shell .manager-equipment-table tbody td {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+  }
+
+  .manager-shell .manager-equipment-table .manager-equipment-action-cell {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .manager-shell .manager-equipment-table .manager-table-link {
+    width: auto;
+    max-width: 65%;
+    text-align: right;
+  }
+
   .manager-shell .manager-equipment-table [data-label]::before {
     content: attr(data-label);
     color: var(--gg-color-text-muted);
@@ -3017,6 +3787,16 @@
     text-align: left;
   }
 
+  .manager-shell .manager-workcenter-table .manager-workcenter-action-cell {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .manager-shell .manager-workcenter-action-cell .manager-inline-actions {
+    width: min(220px, 65%);
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+
   .manager-workcenter-overlay .modal-actions .gg-button { width: 100%; }
 
   .manager-shell .manager-teams-table,
@@ -3056,12 +3836,32 @@
   }
 
   .manager-shell .manager-teams-table [data-label]::before {
+    width: auto;
+    height: auto;
+    margin: 0;
+    border-radius: 0;
+    background: transparent;
     content: attr(data-label);
     flex: 0 0 90px;
     color: var(--gg-color-text-muted);
     font-size: var(--gg-text-xs);
     font-weight: 700;
     text-align: left;
+    vertical-align: baseline;
+  }
+
+  .manager-shell .manager-teams-table .manager-team-action {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .manager-shell .manager-team-members-summary {
+    max-width: 65%;
+    justify-content: flex-end;
+  }
+
+  .manager-shell .manager-team-action .manager-inline-actions {
+    width: min(300px, 72%);
   }
 
   .manager-shell .manager-team-action .gg-button,
@@ -3684,6 +4484,175 @@
 .technician-request-empty span { display: block; }
 .technician-request-empty strong { margin-bottom: var(--gg-space-1); font-size: var(--gg-text-lg); }
 .technician-request-empty span { color: var(--gg-color-text-muted); }
+
+/* Requests workspace: use the same readable register and surface hierarchy as
+   the manager directories without changing request selection or workflow. */
+.technician-shell .technician-requests-page {
+  display: grid;
+  gap: var(--gg-space-4);
+}
+
+.technician-shell .technician-requests-page .page-header,
+.technician-shell .technician-requests-page .request-top-bar,
+.technician-shell .technician-requests-page .status-alert-dots,
+.technician-shell .technician-requests-page .table-wrap,
+.technician-shell .technician-requests-page .request-layout {
+  margin: 0;
+}
+
+.technician-shell .technician-requests-page .request-top-bar {
+  min-height: 78px;
+  align-items: center;
+  gap: var(--gg-space-4);
+  padding: var(--gg-space-3) var(--gg-space-4);
+}
+
+.technician-shell .technician-requests-page .status-timeline {
+  min-width: 0;
+  flex: 1;
+}
+
+.technician-shell .technician-requests-page .status-alert-dots {
+  min-height: 20px;
+  align-items: center;
+}
+
+.technician-shell .technician-requests-page .table-wrap {
+  max-height: 320px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-radius: calc(var(--gg-radius-lg) + 2px);
+}
+
+.technician-shell .technician-requests-page .requests-table {
+  width: 100%;
+  table-layout: fixed;
+  font-size: var(--gg-text-sm);
+}
+
+.technician-shell .technician-requests-page .requests-table th,
+.technician-shell .technician-requests-page .requests-table td {
+  height: 52px;
+  padding: 10px var(--gg-space-4);
+  vertical-align: middle;
+}
+
+.technician-shell .technician-requests-page .requests-table th:first-child { width: 42%; }
+.technician-shell .technician-requests-page .requests-table th:nth-child(2) { width: 13%; }
+.technician-shell .technician-requests-page .requests-table th:nth-child(3) { width: 13%; }
+.technician-shell .technician-requests-page .requests-table th:nth-child(4) { width: 16%; }
+.technician-shell .technician-requests-page .requests-table th:nth-child(5) { width: 16%; }
+
+.technician-shell .technician-requests-page .requests-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 44px;
+  background: var(--gg-color-surface-subtle);
+  color: var(--gg-color-text-muted);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.technician-shell .technician-requests-page .requests-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--gg-color-surface-subtle) 35%, var(--gg-color-surface));
+}
+
+.technician-shell .technician-requests-page .requests-table tbody tr {
+  cursor: pointer;
+  transition: background-color var(--gg-duration-fast) var(--gg-ease-standard), box-shadow var(--gg-duration-fast) var(--gg-ease-standard);
+}
+
+.technician-shell .technician-requests-page .requests-table tbody tr.is-selected {
+  background: var(--gg-color-primary-soft);
+  box-shadow: inset 3px 0 var(--gg-color-primary);
+}
+
+.technician-shell .request-table-subject {
+  display: block;
+  overflow: hidden;
+  color: var(--gg-color-text);
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.technician-shell .request-table-status,
+.technician-shell .request-table-type {
+  display: inline-flex;
+  width: fit-content;
+  padding: 4px 8px;
+  border: 1px solid var(--gg-color-border-accent);
+  border-radius: 999px;
+  background: var(--gg-color-primary-soft);
+  color: var(--gg-color-primary-text);
+  font-size: .72rem;
+  font-weight: 750;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.technician-shell .request-table-type {
+  border-color: var(--gg-color-border);
+  background: var(--gg-color-surface-subtle);
+  color: var(--gg-color-text-secondary);
+}
+
+.technician-shell .request-table-status--in_progress { background: var(--gg-color-info-soft); }
+.technician-shell .request-table-status--repaired { background: var(--gg-color-success-soft); color: var(--gg-color-success); }
+.technician-shell .request-table-status--scrap { background: var(--gg-color-danger-soft); color: var(--gg-color-danger); }
+
+.technician-shell .technician-requests-page .request-layout {
+  align-items: stretch;
+  gap: var(--gg-space-4);
+}
+
+.technician-shell .technician-requests-page .request-form-panel,
+.technician-shell .technician-requests-page .request-details-panel {
+  padding: var(--gg-space-5);
+  background: var(--gg-color-surface);
+}
+
+.technician-shell .technician-requests-page .request-title {
+  margin: 0 0 var(--gg-space-4);
+  font-size: var(--gg-text-xl);
+  line-height: 1.25;
+}
+
+.technician-shell .technician-requests-page .form-section {
+  gap: var(--gg-space-2);
+  margin-bottom: var(--gg-space-4);
+}
+
+.technician-shell .technician-requests-page .form-section:last-child { margin-bottom: 0; }
+
+.technician-shell .technician-requests-page .form-section label {
+  font-size: var(--gg-text-xs);
+  font-weight: 750;
+}
+
+.technician-shell .technician-requests-page .form-input {
+  min-height: 44px;
+  padding-inline: var(--gg-space-3);
+  border-radius: var(--gg-radius-md);
+  font-size: var(--gg-text-sm);
+}
+
+@media (max-width: 760px) {
+  .technician-shell .technician-requests-page .status-timeline { display: none; }
+  .technician-shell .technician-requests-page .requests-table,
+  .technician-shell .technician-requests-page .requests-table tbody,
+  .technician-shell .technician-requests-page .requests-table tr,
+  .technician-shell .technician-requests-page .requests-table td { display: block; width: 100%; }
+  .technician-shell .technician-requests-page .requests-table thead { display: none; }
+  .technician-shell .technician-requests-page .requests-table tbody { display: grid; gap: var(--gg-space-3); padding: var(--gg-space-3); }
+  .technician-shell .technician-requests-page .requests-table tr { overflow: hidden; border: 1px solid var(--gg-color-border); border-radius: var(--gg-radius-md); }
+  .technician-shell .technician-requests-page .requests-table td { display: flex; height: auto; min-height: 42px; align-items: center; justify-content: space-between; gap: var(--gg-space-4); border: 0; }
+  .technician-shell .technician-requests-page .requests-table td::before { content: attr(data-label); color: var(--gg-color-text-muted); font-size: .68rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+  .technician-shell .request-table-subject { max-width: 68%; text-align: right; }
+}
 
 @media (max-width: 900px) {
   .technician-shell .tech-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

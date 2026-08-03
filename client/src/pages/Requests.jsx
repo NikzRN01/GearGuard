@@ -104,11 +104,11 @@ export default function Requests() {
 				: sourceList;
 			setRequests(list);
 			if (opts?.request_id) {
-				setActiveRequest(list.find((request) => Number(request.id) === Number(opts.request_id)) || list[0] || null);
+				setActiveRequest(list.find((request) => Number(request.id) === Number(opts.request_id)) || null);
 				return;
 			}
 			if (activeRequest?.id && list.some((r) => Number(r.id) === Number(activeRequest.id))) return;
-			setActiveRequest(list[0] || null);
+			setActiveRequest(null);
 		} catch (e) {
 			setError(e?.response?.data?.message || 'Failed to load requests');
 		} finally {
@@ -131,13 +131,13 @@ export default function Requests() {
 	}, []);
 
 	useEffect(() => {
-		if (!showNewModal && !showCompleteModal) return undefined;
+		if (!showNewModal && !showCompleteModal && !activeRequest) return undefined;
 		const previousOverflow = document.body.style.overflow;
 		document.body.style.overflow = 'hidden';
 		return () => {
 			document.body.style.overflow = previousOverflow;
 		};
-	}, [showNewModal, showCompleteModal]);
+	}, [showNewModal, showCompleteModal, activeRequest]);
 
 	useEffect(() => {
 		loadRequestsList(scope);
@@ -411,16 +411,15 @@ export default function Requests() {
 						{requests.map((r) => (
 							<tr
 								key={r.id}
-								className="table-row-click"
+								className={`table-row-click ${activeRequest?.id === r.id ? 'is-selected' : ''}`}
 								onClick={() => loadRequestById(r.id)}
 								title="Open request"
-								style={activeRequest?.id === r.id ? { outline: '2px solid var(--gg-color-border-accent)', outlineOffset: -2 } : undefined}
 							>
-								<td>{r.subject}</td>
-								<td>{r.status}</td>
-								<td>{r.type}</td>
-								<td>{r.scheduled_date ? String(r.scheduled_date).slice(0, 10) : '-'}</td>
-								<td>{r.assigned_to_name || '-'}</td>
+								<td data-label="Subject"><strong className="request-table-subject">{r.subject}</strong></td>
+								<td data-label="Status"><span className={`request-table-status request-table-status--${r.status}`}>{String(r.status || 'unknown').replaceAll('_', ' ')}</span></td>
+								<td data-label="Type"><span className="request-table-type">{r.type}</span></td>
+								<td data-label="Scheduled">{r.scheduled_date ? String(r.scheduled_date).slice(0, 10) : 'Not scheduled'}</td>
+								<td data-label="Assigned To">{r.assigned_to_name || 'Unassigned'}</td>
 							</tr>
 						))}
 						{requests.length === 0 && (
@@ -434,9 +433,59 @@ export default function Requests() {
 				</table>
 			</div>
 
+			{activeRequest && createPortal(
+				<div className="request-detail-overlay" onMouseDown={(event) => {
+					if (event.target === event.currentTarget) setActiveRequest(null);
+				}}>
+					<section className="request-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="request-detail-title">
+						<header className="request-detail-dialog__header">
+							<div>
+								<span>Request #{activeRequest.id}</span>
+								<h2 id="request-detail-title">{formData.subject}</h2>
+							</div>
+							<button className="request-detail-dialog__close" type="button" onClick={() => setActiveRequest(null)} aria-label="Close request details">×</button>
+						</header>
+
+						<div className="request-detail-dialog__status">
+							<span className={`request-table-status request-table-status--${activeRequest.status}`}>{String(activeRequest.status || 'unknown').replaceAll('_', ' ')}</span>
+							<span className="request-table-type">{formData.maintenanceType}</span>
+						</div>
+
+						<dl className="request-detail-grid">
+							<div><dt>Created by</dt><dd>{formData.createdBy || 'Not recorded'}</dd></div>
+							<div><dt>Maintenance for</dt><dd>{formData.maintenanceFor === 'equipment' ? 'Equipment' : 'Work Center'}</dd></div>
+							<div><dt>{formData.maintenanceFor === 'equipment' ? 'Equipment' : 'Work center'}</dt><dd>{formData.maintenanceFor === 'equipment' ? formData.equipment : formData.workCenter || 'Not assigned'}</dd></div>
+							<div><dt>Category</dt><dd>{formData.category || 'Not recorded'}</dd></div>
+							<div><dt>Team</dt><dd>{formData.team || 'Not assigned'}</dd></div>
+							<div><dt>Assigned to</dt><dd>{formData.internalMaintenance || 'Unassigned'}</dd></div>
+							<div><dt>Request date</dt><dd>{formData.requestDate || 'Not recorded'}</dd></div>
+							<div><dt>Scheduled</dt><dd>{formData.scheduledDate || 'Not scheduled'}</dd></div>
+							<div><dt>Duration</dt><dd>{formData.duration ? `${formData.duration} hours` : 'Not recorded'}</dd></div>
+							<div><dt>Company</dt><dd>{formData.company}</dd></div>
+						</dl>
+
+						{user?.role !== 'user' && <div className="request-detail-notes">
+							<div className="tabs-header" role="tablist" aria-label="Request notes and instructions">
+								<button className={`tab-btn ${activeTab === 'notes' ? 'active' : ''}`} type="button" onClick={() => setActiveTab('notes')} role="tab" aria-selected={activeTab === 'notes'}>Notes</button>
+								<button className={`tab-btn ${activeTab === 'instructions' ? 'active' : ''}`} type="button" onClick={() => setActiveTab('instructions')} role="tab" aria-selected={activeTab === 'instructions'}>Instructions</button>
+							</div>
+							<textarea className="notes-textarea" placeholder={activeTab === 'notes' ? 'Add notes here...' : 'Add instructions here...'} defaultValue="" />
+						</div>}
+
+						<footer className="request-detail-dialog__footer">
+							<button className="btn-secondary" type="button" onClick={() => setActiveRequest(null)}>Close</button>
+							{user?.role !== 'user' && !activeRequest.assigned_to_user_id && <button className="btn-new" type="button" onClick={assignToMe}>Assign to me</button>}
+							{Number(activeRequest.assigned_to_user_id) === Number(user?.id) && activeRequest.status === 'new' && <button className="btn-new" type="button" onClick={() => updateStatus('in_progress')}>Start work</button>}
+							{Number(activeRequest.assigned_to_user_id) === Number(user?.id) && activeRequest.status === 'in_progress' && <button className="btn-new" type="button" onClick={() => { setDurationHours(''); setCompleteError(''); setShowCompleteModal(true); }}>Complete</button>}
+						</footer>
+					</section>
+				</div>,
+				document.body
+			)}
+
 			<div className="request-layout">
 				{/* Left panel - Form */}
-				<div className="request-form-panel">
+				<div className="request-form-panel request-overview-card request-overview-card--primary">
 					<h2 className="request-title">{formData.subject || (loading ? 'Loading…' : 'No request selected')}</h2>
 
 					<div className="form-section">
@@ -545,7 +594,7 @@ export default function Requests() {
 				</div>
 
 				{/* Right panel - Details */}
-				<div className="request-details-panel">
+				<div className="request-details-panel request-overview-card request-overview-card--secondary">
 					<div className="form-section">
 						<label>Team</label>
 						<input
@@ -872,7 +921,7 @@ export default function Requests() {
 			)}
 
 			{/* Tabs */}
-			{user?.role !== 'user' && <div className="tabs-section">
+			{user?.role !== 'user' && <div className="tabs-section request-notes-card">
 				<div className="tabs-header" role="tablist" aria-label="Request notes and instructions">
 					<button
 						className={`tab-btn ${activeTab === 'notes' ? 'active' : ''}`}

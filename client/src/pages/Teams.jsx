@@ -213,7 +213,7 @@ export default function Teams() {
                         <tr>
                             <th scope="col">Team Name</th>
                             <th scope="col">Team Members</th>
-                            <th scope="col">Actions</th>
+                            <th className="manager-team-actions-heading" scope="col">Actions</th>
                         </tr>
                     </thead>
 
@@ -222,10 +222,10 @@ export default function Teams() {
                             <tr key={r.id}>
                                 <th scope="row" data-label="Team name">{r.name}</th>
                                 <td data-label="Team members">
-                                    {r.members && r.members.length > 0 
-                                        ? r.members.map(m => m.name).join(', ')
-                                        : 'No members yet'
-                                    }
+                                    <div className="manager-team-members-summary">
+                                        <span className="manager-team-member-count">{r.members?.length || 0}</span>
+                                        <span>{r.members?.length ? r.members.map((member) => member.name).join(', ') : 'No members yet'}</span>
+                                    </div>
                                 </td>
                                 <td className="manager-team-action">
                                     {canManageTeams ? <div className="manager-inline-actions"><Button variant="secondary" size="small" onClick={() => openAddMember(r)}>Members</Button><Button variant="tertiary" size="small" onClick={() => renameTeam(r)}>Rename</Button><Button variant="danger" size="small" onClick={() => deleteTeam(r)}>Delete</Button></div> : <span className="manager-muted-cell">View only</span>}

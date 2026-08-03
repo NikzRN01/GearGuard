@@ -16,6 +16,9 @@ import { getSessionUser } from '../services/session';
 const CLOSED_STATUSES = new Set(['repaired', 'scrap', 'completed', 'closed']);
 const isOpen = (request) => !CLOSED_STATUSES.has(String(request.status || '').toLowerCase());
 const dateKey = (value) => value ? String(value).slice(0, 10) : '';
+const formatRole = (role) => String(role || '')
+  .replace(/[_-]+/g, ' ')
+  .replace(/\b\w/g, (character) => character.toUpperCase());
 const todayKey = () => {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -275,15 +278,33 @@ export default function ManagerRequests() {
 
               <form className="manager-form-section manager-form-section--assignment" aria-busy={assignmentSaving} onSubmit={(event) => { event.preventDefault(); assign(); }}>
                 <div className="manager-section-intro"><span className="manager-section-number" aria-hidden="true">02</span><div><h3>Assignment</h3><p>Route work to an eligible technician or manager.</p></div></div>
-                <Field label="Technician or manager" hint={!isOpen(detail) ? 'Closed requests cannot be reassigned.' : 'Press Enter to confirm the selected assignee.'}><select value={assigneeId} disabled={!isOpen(detail) || assignmentSaving} onChange={(event) => setAssigneeId(event.target.value)}><option value="">Select an assignee</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name} · {user.role}</option>)}</select></Field>
-                <Button type="submit" pending={assignmentSaving} pendingLabel="Updating assignment..." disabled={!isOpen(detail) || !assigneeId || String(detail.assigned_to_user_id || '') === assigneeId}>Update assignment</Button>
+                <Field className="manager-assignment-field" label="Technician or manager" hint={!isOpen(detail) ? 'Closed requests cannot be reassigned.' : 'Choose an assignee, then update the assignment.'}>
+                  <SelectMenu
+                    ariaLabel="Select an assignee"
+                    value={assigneeId}
+                    disabled={!isOpen(detail) || assignmentSaving}
+                    onChange={setAssigneeId}
+                    portal
+                    options={[
+                      { value: '', label: 'Select an assignee' },
+                      ...users.map((user) => ({ value: String(user.id), label: `${user.name} · ${formatRole(user.role)}` })),
+                    ]}
+                  />
+                </Field>
+                <div className="manager-assignment-action-wrap">
+                  <span aria-hidden="true">Assignment action</span>
+                  <Button className="manager-assignment-action" type="submit" pending={assignmentSaving} pendingLabel="Updating assignment..." disabled={!isOpen(detail) || !assigneeId || String(detail.assigned_to_user_id || '') === assigneeId}>Update assignment</Button>
+                </div>
                 {assignmentFeedback && <p className="manager-form-feedback" role="status">{assignmentFeedback}</p>}
               </form>
 
               <form className="manager-form-section manager-form-section--schedule" aria-busy={scheduleSaving} onSubmit={(event) => { event.preventDefault(); reschedule(); }}>
                 <div className="manager-section-intro"><span className="manager-section-number" aria-hidden="true">03</span><div><h3>Schedule</h3><p>Set the planned work date. Time scheduling is not yet available.</p></div></div>
                 <Field label="Scheduled date" hint={!isOpen(detail) ? 'Closed requests cannot be rescheduled.' : 'Press Enter to confirm the date.'}><Input type="date" value={scheduledDate} disabled={!isOpen(detail) || scheduleSaving} onChange={(event) => setScheduledDate(event.target.value)} /></Field>
-                <Button type="submit" variant="secondary" pending={scheduleSaving} pendingLabel="Updating date..." disabled={!isOpen(detail) || dateKey(detail.scheduled_date) === scheduledDate}>Update date</Button>
+                <div className="manager-schedule-action-wrap">
+                  <span aria-hidden="true">Schedule action</span>
+                  <Button className="manager-schedule-action" type="submit" variant="secondary" pending={scheduleSaving} pendingLabel="Updating date..." disabled={!isOpen(detail) || dateKey(detail.scheduled_date) === scheduledDate}>Update date</Button>
+                </div>
                 {scheduleFeedback && <p className="manager-form-feedback" role="status">{scheduleFeedback}</p>}
               </form>
 
